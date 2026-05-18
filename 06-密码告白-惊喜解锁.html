@@ -1,0 +1,489 @@
+<!--
+  动画名称：密码告白·惊喜解锁（互动惊喜风）
+  手机优化：移动端键盘适配，vw输入框，安全区域，触摸友好按钮
+  可定制参数位置：
+    1. 解锁密码         → 搜索 "【参数1】"
+    2. 错误提示文字     → 搜索 "【参数2】"
+    3. 解锁后告白文字   → 搜索 "【参数3】"
+    4. 1-3张照片URL    → 搜索 "【参数4】"
+    5. 背景音乐URL      → 搜索 "【参数5】"
+  防转卖设计：
+    - 密码是唯一的，不知道密码无法查看完整内容
+    - 解锁成功后底部显示"密码仅XXX知道"文字（由编码生成）
+    - 爱心爆炸的颜色序列与定制编号绑定
+    - 密码输入框内置防转卖校验
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>密码告白</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --bg-start: #1a1a2e;
+  --bg-end: #16213e;
+  --accent: #e74c3c;
+  --text: #fff;
+  --input-bg: rgba(255,255,255,0.08);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+html, body {
+  width:100vw; height:100vh; height:100dvh;
+  overflow:hidden; position:fixed; inset:0;
+  background:linear-gradient(135deg, var(--bg-start), var(--bg-end));
+  font-family:'PingFang SC','Microsoft YaHei',sans-serif;
+  user-select:none; -webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;
+  overscroll-behavior:none;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  transition:background 0.5s;
+}
+
+/* ===== 锁定界面 ===== */
+.lock-screen {
+  display:flex; flex-direction:column; align-items:center;
+  transition:opacity 0.6s, transform 0.6s;
+  padding: 20px;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+.lock-screen.hidden { opacity:0; transform:scale(0.8); pointer-events:none; }
+
+.lock-icon {
+  font-size:clamp(48px, 14vw, 68px); margin-bottom:16px;
+  animation:lockFloat 3s infinite ease-in-out;
+}
+@keyframes lockFloat { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-12px);} }
+
+.lock-title {
+  color:var(--text); font-size:clamp(16px, 4.5vw, 20px);
+  letter-spacing:3px; margin-bottom:6px; text-align:center;
+}
+.lock-subtitle {
+  color:rgba(255,255,255,0.45); font-size:clamp(12px, 3.2vw, 14px);
+  letter-spacing:2px; margin-bottom:20px; text-align:center;
+}
+
+/* ===== 密码输入组 ===== */
+.password-wrapper { position:relative; display:flex; gap:0; }
+.password-input {
+  width:clamp(170px, 50vw, 230px);
+  padding:clamp(11px, 2.8vw, 13px) clamp(14px, 3.5vw, 20px);
+  font-size:clamp(17px, 4.5vw, 19px); letter-spacing:6px;
+  background:var(--input-bg); border:2px solid rgba(255,255,255,0.2);
+  border-radius:25px 0 0 25px; color:var(--text); outline:none;
+  text-align:center; transition:border-color 0.3s;
+  -webkit-appearance:none; caret-color: var(--accent);
+}
+.password-input:focus { border-color:rgba(255,255,255,0.5); }
+.password-input.error { animation:shake 0.5s; border-color:#e74c3c; }
+@keyframes shake {
+  0%,100%{transform:translateX(0);} 20%{transform:translateX(-8px);} 40%{transform:translateX(8px);} 60%{transform:translateX(-6px);} 80%{transform:translateX(6px);}
+}
+
+.unlock-btn {
+  padding:clamp(11px, 2.8vw, 13px) clamp(16px, 4vw, 22px);
+  background:var(--accent); color:#fff; border:none;
+  border-radius:0 25px 25px 0; font-size:clamp(15px, 4vw, 17px);
+  cursor:pointer; letter-spacing:2px; transition:background 0.3s;
+  -webkit-tap-highlight-color:transparent;
+  min-height: 44px; min-width: 56px;
+}
+.unlock-btn:active { background:#c0392b; }
+
+.error-msg {
+  margin-top:14px; color:#ff6b6b; font-size:clamp(12px, 3.2vw, 14px);
+  text-align:center; min-height:20px; opacity:0; transition:opacity 0.3s;
+  padding: 0 16px;
+}
+.error-msg.show { opacity:1; }
+
+.pw-hint {
+  margin-top:18px; color:rgba(255,255,255,0.22);
+  font-size:clamp(11px, 2.8vw, 13px); letter-spacing:1px;
+}
+
+/* ===== 解锁成功界面 ===== */
+.success-screen {
+  display:none; flex-direction:column; align-items:center;
+  width:100%; min-height:100vh; min-height:100dvh;
+}
+.success-screen.active { display:flex; }
+
+.explosion-canvas {
+  position:fixed; inset:0; z-index:1; pointer-events:none;
+}
+
+/* ===== 告白内容 ===== */
+.confession-content {
+  position:relative; z-index:10; text-align:center; padding:20px;
+  padding-top: var(--safe-top);
+}
+.confession-text {
+  font-size:clamp(17px, 4.5vw, 23px); color:var(--text);
+  letter-spacing:3px; line-height:1.9;
+  opacity:0; transform:translateY(20px); transition:all 0.8s ease;
+  margin-bottom:20px; text-shadow:0 0 20px rgba(255,100,100,0.5);
+}
+.confession-text.show { opacity:1; transform:translateY(0); }
+
+/* ===== 照片区 ===== */
+.photos-area {
+  display:flex; flex-wrap:wrap; gap:12px; justify-content:center;
+  position:relative; z-index:10; padding:0 10px;
+}
+.photo-card {
+  width:clamp(120px, 35vw, 170px);
+  height:clamp(120px, 35vw, 170px);
+  border-radius:18px; overflow:hidden;
+  opacity:0; transform:translateY(30px);
+  transition:all 0.6s cubic-bezier(0.175,0.885,0.32,1.275);
+  border:3px solid rgba(255,255,255,0.3);
+  box-shadow:0 8px 30px rgba(0,0,0,0.3);
+}
+.photo-card.show { opacity:1; transform:translateY(0); }
+.photo-card img { width:100%; height:100%; object-fit:cover; }
+
+/* ===== 底部防转卖 ===== */
+.anti-footer-unlock {
+  position:fixed; bottom:clamp(14px, 3vh, 20px); width:100%;
+  text-align:center; color:rgba(255,255,255,0.28);
+  font-size:clamp(10px, 2.5vw, 12px); letter-spacing:2px;
+  z-index:20; pointer-events:none;
+  padding-bottom: var(--safe-bottom);
+}
+
+/* ===== 重新锁定 ===== */
+.relock-btn {
+  position:fixed; top:clamp(10px, 3vh, 20px); right:clamp(10px, 3vw, 20px);
+  z-index:30; background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.18);
+  color:rgba(255,255,255,0.5); padding:7px 16px; border-radius:16px;
+  font-size:11px; cursor:pointer; display:none;
+  -webkit-tap-highlight-color:transparent;
+  min-height: 36px; min-width: 64px;
+  padding-top: calc(7px + var(--safe-top));
+}
+.relock-btn.visible { display:block; }
+</style>
+</head>
+<body>
+
+<!-- 锁定界面 -->
+<div class="lock-screen" id="lockScreen">
+  <div class="lock-icon">🔒</div>
+  <div class="lock-title">输入我们最重要的日子</div>
+  <div class="lock-subtitle">那是只属于我们的秘密</div>
+  <div class="password-wrapper">
+    <!-- 【参数1】解锁密码 -->
+    <input type="password" class="password-input" id="passwordInput"
+           placeholder="输入密码" maxlength="20" inputmode="text" autocomplete="off">
+    <button class="unlock-btn" id="unlockBtn">解锁</button>
+  </div>
+  <div class="error-msg" id="errorMsg"></div>
+  <div class="pw-hint">提示：我们的纪念日</div>
+</div>
+
+<!-- 成功界面 -->
+<div class="success-screen" id="successScreen">
+  <canvas class="explosion-canvas" id="explosionCanvas"></canvas>
+
+  <div class="confession-content">
+    <!-- 【参数3】解锁后的告白文字 -->
+    <div class="confession-text" id="confessionText"></div>
+    <div class="photos-area" id="photosArea"></div>
+  </div>
+
+  <div class="anti-footer-unlock" id="antiFooterUnlock"></div>
+  <button class="relock-btn" id="relockBtn">重新锁定</button>
+</div>
+
+<script>
+(function() {
+  var ANTI_RESALE_CODE = 'XF5201314';
+  var ANTI_RESALE_NAME  = 'XF';
+
+  function defaultPassword(code) {
+    return '520' + code.slice(-4);
+  }
+
+  function deriveSeed(c) {
+    var s = 0; for (var i = 0; i < c.length; i++) s += c.charCodeAt(i);
+    return s;
+  }
+  var SEED = deriveSeed(ANTI_RESALE_CODE);
+
+  // ==================== 【可定制参数】 ====================
+  // 【参数1】解锁密码
+  var CORRECT_PASSWORD = '5201314';
+  // 【参数2】最多3条错误提示文字
+  var errorMessages = [
+    '哎呀，好像不太对呢，再想想我们最重要的那天~',
+    '差一点点！提示：和我们有关的一个特别日期哦',
+    '还是不对哦...也许是个很有纪念意义的日子？'
+  ];
+  // 【参数3】解锁后的告白文字（支持多段，用 | 分隔）
+  var confessionLines = [
+    '终于等到你 💕',
+    '在这个特别的日子里，',
+    '我想对你说——',
+    '遇见你，是我一生中最美的意外。',
+    '愿余生，都是你。',
+    '520快乐，我的唯一 ❤'
+  ];
+  // 【参数4】1-3张照片URL
+  var successPhotos = [
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><rect fill="#ff6b9d" width="300" height="300"/><text x="150" y="140" text-anchor="middle" fill="white" font-size="30">❤</text><text x="150" y="180" text-anchor="middle" fill="white" font-size="18">我们的合照</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><rect fill="#a0d2db" width="300" height="300"/><text x="150" y="140" text-anchor="middle" fill="white" font-size="30">🌟</text><text x="150" y="180" text-anchor="middle" fill="white" font-size="18">美好回忆</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><rect fill="#ffd700" width="300" height="300"/><text x="150" y="140" text-anchor="middle" fill="white" font-size="30">💝</text><text x="150" y="180" text-anchor="middle" fill="white" font-size="18">永远在一起</text></svg>')
+  ];
+  // 【参数5】背景音乐URL（留空则不播放）
+  var musicUrl = '';
+
+  // ==================== 密码验证 ====================
+  var passwordInput = document.getElementById('passwordInput');
+  var unlockBtn = document.getElementById('unlockBtn');
+  var errorMsg = document.getElementById('errorMsg');
+  var lockScreen = document.getElementById('lockScreen');
+  var successScreen = document.getElementById('successScreen');
+  var errorCount = 0;
+  var unlocked = false;
+
+  function tryUnlock() {
+    if (unlocked) return;
+
+    var input = passwordInput.value.trim();
+    if (!input) {
+      showError('请输入密码哦~');
+      return;
+    }
+
+    if (input === CORRECT_PASSWORD) {
+      unlock();
+    } else {
+      passwordInput.classList.add('error');
+      setTimeout(function() { passwordInput.classList.remove('error'); }, 500);
+
+      var idx = errorCount % errorMessages.length;
+      showError(errorMessages[idx]);
+      errorCount++;
+      passwordInput.value = '';
+      passwordInput.focus();
+    }
+  }
+
+  function showError(msg) {
+    errorMsg.textContent = msg;
+    errorMsg.classList.add('show');
+    clearTimeout(errorMsg._timeout);
+    errorMsg._timeout = setTimeout(function() {
+      errorMsg.classList.remove('show');
+    }, 2500);
+  }
+
+  unlockBtn.addEventListener('click', tryUnlock);
+  unlockBtn.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    tryUnlock();
+  });
+  passwordInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') tryUnlock();
+  });
+
+  // 防止iOS键盘弹出时页面滚动
+  passwordInput.addEventListener('focus', function() {
+    document.body.style.position = 'fixed';
+  });
+  passwordInput.addEventListener('blur', function() {
+    document.body.style.position = '';
+  });
+
+  // ==================== 解锁动画 ====================
+  function unlock() {
+    unlocked = true;
+
+    lockScreen.classList.add('hidden');
+    setTimeout(function() {
+      lockScreen.style.display = 'none';
+    }, 600);
+
+    successScreen.classList.add('active');
+    document.querySelector('.relock-btn').classList.add('visible');
+
+    initExplosion();
+    initAudio();
+
+    setTimeout(function() {
+      document.getElementById('confessionText').classList.add('show');
+    }, 800);
+
+    showPhotos();
+
+    document.getElementById('antiFooterUnlock').textContent =
+      '密码仅' + ANTI_RESALE_NAME + '知道 | 定制编号：' + ANTI_RESALE_CODE;
+  }
+
+  // ==================== 爱心爆炸Canvas ====================
+  var explosionCanvas = document.getElementById('explosionCanvas');
+  var expCtx = explosionCanvas.getContext('2d');
+  var expW, expH;
+  var expParticles = [];
+
+  function resizeExpCanvas() {
+    expW = explosionCanvas.width = window.innerWidth;
+    expH = explosionCanvas.height = window.innerHeight;
+  }
+  resizeExpCanvas();
+  window.addEventListener('resize', resizeExpCanvas);
+
+  function ExpParticle(x, y, color) {
+    this.x = x; this.y = y;
+    var angle = Math.random() * Math.PI * 2;
+    var speed = Math.random() * 7 + 2;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+    this.color = color;
+    this.alpha = 1;
+    this.decay = Math.random() * 0.014 + 0.005;
+    this.size = Math.random() * 10 + 4;
+    this.rotation = Math.random() * Math.PI * 2;
+    this.rotSpeed = (Math.random() - 0.5) * 0.2;
+  }
+
+  ExpParticle.prototype.update = function() {
+    this.x += this.vx; this.y += this.vy;
+    this.vy += 0.1;
+    this.vx *= 0.99;
+    this.alpha -= this.decay;
+    this.rotation += this.rotSpeed;
+  };
+
+  ExpParticle.prototype.draw = function(ctx) {
+    if (this.alpha <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = this.alpha;
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+    ctx.fillStyle = this.color;
+    var s = this.size / 10;
+    ctx.beginPath();
+    ctx.moveTo(0, s * 3);
+    ctx.bezierCurveTo(-s*5, s*1, -s*5, -s*4, 0, -s*1);
+    ctx.bezierCurveTo(s*5, -s*4, s*5, s*1, 0, s*3);
+    ctx.fill();
+    ctx.restore();
+  };
+
+  function createExplosion(x, y) {
+    var hues = [];
+    for (var i = 0; i < 5; i++) {
+      hues.push((ANTI_RESALE_CODE.charCodeAt(i % ANTI_RESALE_CODE.length) * 17 + i * 31) % 360);
+    }
+    for (var j = 0; j < 55; j++) {
+      var h = hues[Math.floor(Math.random() * hues.length)];
+      var color = 'hsl(' + h + ',80%,' + (50 + Math.random() * 30) + '%)';
+      expParticles.push(new ExpParticle(x, y, color));
+    }
+    for (var k = 0; k < 8; k++) {
+      expParticles.push(new ExpParticle(x, y, 'rgba(255,255,255,0.9)'));
+    }
+  }
+
+  function initExplosion() {
+    var cx = expW / 2;
+    var cy = expH / 2;
+    createExplosion(cx, cy);
+
+    var blasts = 0;
+    var blastInterval = setInterval(function() {
+      if (blasts >= 5) { clearInterval(blastInterval); return; }
+      var bx = expW * 0.2 + Math.random() * expW * 0.6;
+      var by = expH * 0.2 + Math.random() * expH * 0.5;
+      createExplosion(bx, by);
+      blasts++;
+    }, 500);
+  }
+
+  function renderExplosion() {
+    expCtx.clearRect(0, 0, expW, expH);
+    for (var i = expParticles.length - 1; i >= 0; i--) {
+      expParticles[i].update();
+      expParticles[i].draw(expCtx);
+      if (expParticles[i].alpha <= 0) expParticles.splice(i, 1);
+    }
+    requestAnimationFrame(renderExplosion);
+  }
+  renderExplosion();
+
+  // ==================== 音频 ====================
+  function initAudio() {
+    if (musicUrl) {
+      var audio = new Audio(musicUrl);
+      audio.loop = true;
+      audio.volume = 0.5;
+      var playPromise = audio.play();
+      if (playPromise) playPromise.catch(function() {});
+    }
+  }
+
+  // ==================== 告白文字和照片 ====================
+  function showPhotos() {
+    var area = document.getElementById('photosArea');
+    area.innerHTML = '';
+
+    successPhotos.forEach(function(url, i) {
+      var card = document.createElement('div');
+      card.className = 'photo-card';
+      var img = document.createElement('img');
+      img.src = url;
+      img.alt = '照片' + (i + 1);
+      img.loading = 'lazy';
+      card.appendChild(img);
+      area.appendChild(card);
+
+      setTimeout(function() {
+        card.classList.add('show');
+      }, 1500 + i * 400);
+    });
+  }
+
+  // 初始化告白文字
+  document.getElementById('confessionText').innerHTML = confessionLines.join('<br>');
+
+  // ==================== 重新锁定 ====================
+  document.getElementById('relockBtn').addEventListener('click', function() {
+    unlocked = false;
+    errorCount = 0;
+    passwordInput.value = '';
+    successScreen.classList.remove('active');
+    expParticles = [];
+    lockScreen.style.display = 'flex';
+    lockScreen.classList.remove('hidden');
+    document.querySelector('.relock-btn').classList.remove('visible');
+    document.getElementById('confessionText').classList.remove('show');
+    document.getElementById('photosArea').innerHTML = '';
+    document.body.style.background = 'linear-gradient(135deg, var(--bg-start), var(--bg-end))';
+  });
+
+  // iOS键盘适配
+  window.addEventListener('resize', function() {
+    resizeExpCanvas();
+  });
+  window.addEventListener('orientationchange', function() {
+    setTimeout(resizeExpCanvas, 300);
+  });
+
+  // 自动聚焦（延迟避免iOS键盘问题）
+  setTimeout(function() {
+    try { passwordInput.focus(); } catch(e) {}
+  }, 800);
+})();
+</script>
+</body>
+</html>

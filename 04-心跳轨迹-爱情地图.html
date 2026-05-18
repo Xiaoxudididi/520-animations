@@ -1,0 +1,378 @@
+<!--
+  动画名称：心跳轨迹·爱情地图（科技感浪漫）
+  手机优化：全屏地图，自适应ECG面板，安全区域卡片，触摸友好
+  可定制参数位置：
+    1. 3个地点的经纬度和名称 → 搜索 "【参数1】"
+    2. 每个地点的日期和事件 → 搜索 "【参数2】"
+    3. 心跳速度           → 搜索 "【参数3】"
+    4. 地图风格           → 搜索 "【参数4】"
+    5. 结尾告白文字       → 搜索 "【参数5】"
+  防转卖设计：
+    - 地图底部强制显示"为XXX和XXX专属制作"文字，DOM中分散存储难以删除
+    - 每个地点标记颜色由定制编号唯一决定
+    - 心跳线颜色与编码绑定
+  技术说明：使用Leaflet.js + OpenStreetMap，无需API密钥
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>心跳轨迹·爱情地图</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  width:100vw; height:100vh; height:100dvh;
+  overflow:hidden; position:fixed; inset:0;
+  background:#0d1117;
+  font-family:'PingFang SC','Microsoft YaHei',sans-serif;
+  user-select:none; -webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;
+  overscroll-behavior:none;
+}
+
+/* ===== 心电图区域 ===== */
+.ecg-panel {
+  position:fixed; top:0; left:0; right:0;
+  height:clamp(90px, 18vh, 130px);
+  z-index:1000; pointer-events:none;
+  background:linear-gradient(180deg, rgba(13,17,23,0.98), rgba(13,17,23,0.6), transparent);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.ecg-canvas { width:100%; height:100%; display:block; }
+
+/* ===== 地图容器 ===== */
+#mapContainer {
+  position:fixed; inset:0; z-index:1;
+}
+
+/* ===== 进度条 ===== */
+.progress-bar {
+  position:fixed; top:clamp(90px, 18vh, 130px); left:12px; right:12px;
+  height:3px; z-index:1000; background:rgba(255,255,255,0.08);
+  border-radius:2px; overflow:hidden;
+}
+.progress-fill {
+  height:100%; background:linear-gradient(90deg, #e74c3c, #ff6b9d);
+  border-radius:2px; transition:width 0.8s ease; width:0%;
+}
+
+/* ===== 信息卡片 ===== */
+.info-card {
+  position:fixed; bottom:clamp(90px, 16vh, 110px); left:50%; transform:translateX(-50%);
+  background:rgba(13,17,23,0.92);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:18px; padding:clamp(12px, 3vw, 16px) clamp(18px, 5vw, 24px);
+  color:#fff; z-index:1000; text-align:center;
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  min-width:clamp(240px, 70vw, 300px); max-width:88vw;
+  transition:opacity 0.5s;
+}
+.info-card .location-name {
+  font-size:clamp(16px, 4.5vw, 20px);
+  font-weight:bold; margin-bottom:4px; letter-spacing:2px;
+}
+.info-card .location-date {
+  font-size:clamp(11px, 3vw, 13px);
+  color:rgba(255,255,255,0.55); margin-bottom:4px;
+}
+.info-card .location-desc {
+  font-size:clamp(12px, 3.2vw, 14px);
+  color:rgba(255,255,255,0.75); line-height:1.5;
+}
+
+/* ===== 底部文字 ===== */
+.footer-text {
+  position:fixed; bottom:clamp(10px, 2vh, 20px); width:100%;
+  text-align:center; z-index:1000;
+  color:rgba(255,255,255,0.35); font-size:clamp(10px, 2.5vw, 12px);
+  letter-spacing:2px; pointer-events:none;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ===== 最终告白弹窗 ===== */
+.final-confession {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(0);
+  background:rgba(0,0,0,0.88); border:2px solid rgba(255,100,100,0.45);
+  border-radius:22px; padding:clamp(24px, 6vw, 32px); color:#fff;
+  z-index:2000; text-align:center;
+  font-size:clamp(18px, 5vw, 24px); letter-spacing:3px;
+  transition:transform 0.6s cubic-bezier(0.175,0.885,0.32,1.275);
+  backdrop-filter:blur(15px); -webkit-backdrop-filter:blur(15px);
+  pointer-events:none; max-width:85vw; line-height:1.7;
+}
+.final-confession.show { transform:translate(-50%,-50%) scale(1); }
+.final-confession .heart-icon {
+  font-size:clamp(40px, 12vw, 52px); display:block; margin-bottom:8px;
+  animation:pulse 1s infinite;
+}
+@keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.15);} }
+
+/* ===== Leaflet覆盖样式 ===== */
+.leaflet-control-zoom { display:none; }
+.love-popup .leaflet-popup-content-wrapper {
+  background:rgba(13,17,23,0.9); color:#fff; border-radius:12px;
+  border:1px solid rgba(255,255,255,0.15);
+}
+.love-popup .leaflet-popup-tip { background:rgba(13,17,23,0.9); }
+</style>
+</head>
+<body>
+
+<div class="ecg-panel">
+  <canvas class="ecg-canvas" id="ecgCanvas"></canvas>
+</div>
+<div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+<div id="mapContainer"></div>
+
+<div class="info-card" id="infoCard">
+  <div class="location-name" id="locName">准备开始...</div>
+  <div class="location-date" id="locDate"></div>
+  <div class="location-desc" id="locDesc"></div>
+</div>
+
+<div class="footer-text" id="footerText"></div>
+
+<div class="final-confession" id="finalConfession">
+  <span class="heart-icon">💝</span>
+  <span id="finalText"></span>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function() {
+  var ANTI_RESALE_CODE = 'XF5201314';
+  var _n1 = 'XF';
+  var _n2 = '小仙女';
+  var ANTI_RESALE_NAMES = _n1 + '和' + _n2;
+
+  function deriveSeed(c) {
+    var s = 0; for (var i = 0; i < c.length; i++) s += c.charCodeAt(i);
+    return s;
+  }
+  var SEED = deriveSeed(ANTI_RESALE_CODE);
+
+  var MARKER_COLORS = [];
+  for (var ci = 0; ci < 3; ci++) {
+    var h = (ANTI_RESALE_CODE.charCodeAt(ci % ANTI_RESALE_CODE.length) * 13 + ci * 47) % 360;
+    MARKER_COLORS.push('hsl(' + h + ',70%,55%)');
+  }
+
+  // ==================== 【可定制参数】 ====================
+  // 【参数1】3个重要地点 [纬度, 经度, 地点名称]
+  var locations = [
+    { lat: 31.2304, lng: 121.4737, name: '相遇 · 上海外滩' },
+    { lat: 30.2741, lng: 120.1551, name: '第一次约会 · 西湖断桥' },
+    { lat: 39.9042, lng: 116.4074, name: '确定关系 · 北京故宫' }
+  ];
+  // 【参数2】每个地点对应的日期和事件描述
+  var locationDetails = [
+    { date: '2023年3月15日', desc: '在人海中遇见了你，从此世界变得不同' },
+    { date: '2023年6月21日', desc: '西湖边的第一次约会，你说喜欢夏天的风' },
+    { date: '2023年12月25日', desc: '圣诞节的雪夜里，我们确定了彼此的心意' }
+  ];
+  // 【参数3】心跳速度（1-5，1最慢，5最快）
+  var heartbeatSpeed = 3;
+  // 【参数4】地图风格：standard(标准)/satellite(卫星)/night(夜景)
+  var mapStyle = 'standard';
+  // 【参数5】结尾告白文字
+  var finalMessage = '走过千山万水，最想去的地方，是你的心里';
+
+  // ==================== 地图初始化 ====================
+  var mapContainer = document.getElementById('mapContainer');
+
+  var tileUrls = {
+    standard: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    night: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+  };
+  var tileAttributions = {
+    standard: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    satellite: '&copy; Esri',
+    night: '&copy; <a href="https://carto.com/">CARTO</a>'
+  };
+
+  var map = L.map(mapContainer, {
+    center: [locations[0].lat, locations[0].lng],
+    zoom: 5,
+    zoomControl: false,
+    attributionControl: false,
+    dragging: true,
+    tap: true
+  });
+
+  L.tileLayer(tileUrls[mapStyle] || tileUrls.standard, {
+    attribution: tileAttributions[mapStyle] || tileAttributions.standard,
+    maxZoom: 18
+  }).addTo(map);
+
+  setTimeout(function() { map.invalidateSize(); }, 600);
+
+  // ==================== 心电图动画 ====================
+  var ecgCanvas = document.getElementById('ecgCanvas');
+  var ecgCtx = ecgCanvas.getContext('2d');
+  var ecgW, ecgH;
+
+  function resizeECG() {
+    ecgW = ecgCanvas.width = ecgCanvas.parentElement.clientWidth;
+    ecgH = ecgCanvas.height = ecgCanvas.parentElement.clientHeight;
+  }
+  resizeECG();
+  window.addEventListener('resize', resizeECG);
+
+  var ecgColorHue = (ANTI_RESALE_CODE.charCodeAt(0) * 7 + ANTI_RESALE_CODE.charCodeAt(3) * 13) % 360;
+  var ecgPhase = 0;
+  var speedMap = { 1:0.025, 2:0.04, 3:0.06, 4:0.08, 5:0.12 };
+  var ecgSpeed = speedMap[heartbeatSpeed] || 0.06;
+
+  function drawECG() {
+    ecgCtx.clearRect(0, 0, ecgW, ecgH);
+
+    // 网格
+    ecgCtx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ecgCtx.lineWidth = 0.5;
+    for (var gy = 0; gy < ecgH; gy += 20) {
+      ecgCtx.beginPath(); ecgCtx.moveTo(0, gy); ecgCtx.lineTo(ecgW, gy); ecgCtx.stroke();
+    }
+    for (var gx = 0; gx < ecgW; gx += 40) {
+      ecgCtx.beginPath(); ecgCtx.moveTo(gx, 0); ecgCtx.lineTo(gx, ecgH); ecgCtx.stroke();
+    }
+
+    ecgCtx.strokeStyle = 'hsl(' + ecgColorHue + ',80%,55%)';
+    ecgCtx.lineWidth = 2;
+    ecgCtx.shadowColor = 'hsl(' + ecgColorHue + ',80%,55%)';
+    ecgCtx.shadowBlur = 8;
+    ecgCtx.beginPath();
+
+    var midY = ecgH / 2;
+    for (var x = 0; x < ecgW; x++) {
+      var t = (x / ecgW) * 4 * Math.PI + ecgPhase;
+      var y = midY;
+      var wavePhase = t % (2 * Math.PI);
+
+      if (wavePhase < 0.15) {
+        y = midY - 35 * Math.sin(wavePhase / 0.15 * Math.PI);
+      } else if (wavePhase < 0.3) {
+        y = midY + 22 * Math.sin((wavePhase - 0.15) / 0.15 * Math.PI);
+      } else if (wavePhase < 0.45) {
+        y = midY - 12 * Math.sin((wavePhase - 0.3) / 0.15 * Math.PI);
+      } else {
+        y = midY + Math.sin(t) * 2.5;
+      }
+
+      if (x === 0) ecgCtx.moveTo(x, y);
+      else ecgCtx.lineTo(x, y);
+    }
+    ecgCtx.stroke();
+    ecgCtx.shadowBlur = 0;
+
+    ecgPhase += ecgSpeed;
+    requestAnimationFrame(drawECG);
+  }
+  drawECG();
+
+  // ==================== 地点标记动画 ====================
+  var locNameEl = document.getElementById('locName');
+  var locDateEl = document.getElementById('locDate');
+  var locDescEl = document.getElementById('locDesc');
+  var progressFill = document.getElementById('progressFill');
+  var finalConfession = document.getElementById('finalConfession');
+  var finalTextEl = document.getElementById('finalText');
+  var currentLocation = 0;
+  var allMarkers = [];
+
+  function showLocation(index) {
+    if (index >= locations.length) {
+      progressFill.style.width = '100%';
+      setTimeout(showFinalConfession, 1500);
+      return;
+    }
+
+    var loc = locations[index];
+    var detail = locationDetails[index];
+
+    map.flyTo([loc.lat, loc.lng], 13, { duration: 2 });
+
+    var markerColor = MARKER_COLORS[index];
+    var markerIcon = L.divIcon({
+      className: 'custom-marker',
+      html: '<div style="width:22px;height:22px;background:' + markerColor +
+            ';border-radius:50%;border:2.5px solid #fff;box-shadow:0 0 15px ' + markerColor +
+            ';animation:markerPulse 1.5s infinite;"></div>',
+      iconSize: [22, 22],
+      iconAnchor: [11, 11]
+    });
+
+    var marker = L.marker([loc.lat, loc.lng], { icon: markerIcon }).addTo(map);
+
+    setTimeout(function() {
+      marker.bindPopup(
+        '<b>' + loc.name + '</b><br>' + detail.date + '<br>' + detail.desc,
+        { closeButton: false, className: 'love-popup' }
+      ).openPopup();
+    }, 2000);
+
+    allMarkers.push(marker);
+    locNameEl.textContent = loc.name;
+    locDateEl.textContent = detail.date;
+    locDescEl.textContent = detail.desc;
+    progressFill.style.width = ((index + 1) / locations.length * 100) + '%';
+
+    currentLocation++;
+    setTimeout(function() { showLocation(currentLocation); }, 6000);
+  }
+
+  function showFinalConfession() {
+    finalTextEl.textContent = finalMessage;
+    finalConfession.classList.add('show');
+
+    var center = map.getCenter();
+    var heartIcon = L.divIcon({
+      className: 'heart-icon',
+      html: '<div style="font-size:44px;animation:pulse 1.5s infinite;filter:drop-shadow(0 0 20px rgba(255,100,100,0.8));">💖</div>',
+      iconSize: [44, 44],
+      iconAnchor: [22, 22]
+    });
+    L.marker([center.lat, center.lng], { icon: heartIcon }).addTo(map);
+
+    var heartCoords = [];
+    var scale = 0.03;
+    for (var t = 0; t < Math.PI * 2; t += 0.1) {
+      var x = 16 * Math.pow(Math.sin(t), 3);
+      var y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+      heartCoords.push([center.lat + y * scale, center.lng + x * scale]);
+    }
+    L.polyline(heartCoords, {
+      color: 'hsl(' + ecgColorHue + ',80%,55%)',
+      weight: 3, opacity: 0.7, dashArray: '5, 5'
+    }).addTo(map);
+  }
+
+  // ==================== 底部防转卖文字 ====================
+  var _p1 = '为';
+  var _p2 = ANTI_RESALE_NAMES;
+  var _p3 = '专属制作';
+  var _p4 = ' | 定制编号：' + ANTI_RESALE_CODE;
+  document.getElementById('footerText').textContent = _p1 + _p2 + _p3 + _p4;
+
+  // ==================== 启动 ====================
+  setTimeout(function() { showLocation(0); }, 1500);
+
+  window.addEventListener('resize', function() {
+    resizeECG();
+    setTimeout(function() { map.invalidateSize(); }, 300);
+  });
+  window.addEventListener('orientationchange', function() {
+    setTimeout(function() { map.invalidateSize(); }, 500);
+  });
+
+  var styleEl = document.createElement('style');
+  styleEl.textContent = '@keyframes markerPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.5);opacity:0.6}}';
+  document.head.appendChild(styleEl);
+})();
+</script>
+</body>
+</html>

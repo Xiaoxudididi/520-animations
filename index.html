@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>520 浪漫动画</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  width:100vw; min-height:100vh; min-height:100dvh;
+  background:linear-gradient(180deg, #fef0f3 0%, #fce4ec 40%, #f8bbd0 100%);
+  font-family:'PingFang SC','Microsoft YaHei','KaiTi',sans-serif;
+  user-select:none; -webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;
+  overscroll-behavior:none;
+  padding: 0 0 env(safe-area-inset-bottom, 0px) 0;
+}
+
+/* ===== 顶部 ===== */
+.header {
+  text-align:center; padding:clamp(24px, 6vh, 40px) 16px clamp(12px, 3vh, 20px);
+}
+.header .title {
+  font-size:clamp(24px, 7vw, 36px);
+  color:#c0392b; letter-spacing:4px; margin-bottom:6px;
+}
+.header .subtitle {
+  font-size:clamp(13px, 3.5vw, 15px);
+  color:#c0816b; letter-spacing:2px;
+}
+
+/* ===== 桌面端：二维码区域 ===== */
+.qr-section {
+  display:none;
+  text-align:center; padding:0 16px 20px;
+}
+.qr-section .qr-hint {
+  font-size:14px; color:#a0523d; margin-bottom:14px; letter-spacing:2px;
+}
+.qr-section .qr-img {
+  width:min(220px, 55vw); border-radius:16px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.1);
+  background:#fff; padding:8px;
+}
+@media (min-width:768px) {
+  .qr-section { display:block; }
+}
+
+/* ===== 动画列表 ===== */
+.anim-list {
+  padding:0 clamp(12px, 3vw, 20px) clamp(30px, 8vh, 50px);
+  display:flex; flex-direction:column; gap:clamp(12px, 3vw, 16px);
+  max-width:500px; margin:0 auto;
+}
+.anim-card {
+  display:flex; align-items:center; gap:14px;
+  background:rgba(255,255,255,0.75);
+  border-radius:18px; padding:clamp(14px, 3.5vw, 18px);
+  text-decoration:none; color:inherit;
+  box-shadow:0 2px 12px rgba(0,0,0,0.06);
+  transition:transform 0.2s,box-shadow 0.2s;
+  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,0.8);
+  -webkit-tap-highlight-color:transparent;
+  cursor:pointer;
+}
+.anim-card:active { transform:scale(0.97); box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+.anim-card .card-icon {
+  font-size:clamp(32px, 8vw, 40px);
+  flex-shrink:0; width:clamp(44px, 11vw, 52px); text-align:center;
+}
+.anim-card .card-info { flex:1; min-width:0; }
+.anim-card .card-num {
+  font-size:clamp(10px, 2.5vw, 11px);
+  color:#c0816b; letter-spacing:2px; margin-bottom:2px;
+}
+.anim-card .card-name {
+  font-size:clamp(15px, 4vw, 18px);
+  color:#3b2314; letter-spacing:2px; font-weight:bold;
+}
+.anim-card .card-arrow {
+  font-size:20px; color:#c0816b; flex-shrink:0;
+}
+
+/* ===== 底部 ===== */
+.footer {
+  text-align:center; padding:0 16px 24px;
+  color:rgba(180,110,90,0.6); font-size:12px; letter-spacing:2px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">520 浪漫动画</div>
+  <div class="subtitle">六种方式，说一句我爱你</div>
+</div>
+
+<!-- 桌面端扫码区域 -->
+<div class="qr-section">
+  <p class="qr-hint">用微信扫一扫，手机上打开</p>
+  <img class="qr-img" src="qr-home.png" alt="扫码在手机上打开">
+</div>
+
+<div class="anim-list">
+  <a class="anim-card" href="01-手写情书-翻页动画.html">
+    <span class="card-icon">✉️</span>
+    <span class="card-info">
+      <div class="card-num">ANIMATION 01</div>
+      <div class="card-name">手写情书 · 翻页动画</div>
+    </span>
+    <span class="card-arrow">›</span>
+  </a>
+  <a class="anim-card" href="02-爱心拼图-回忆相册.html">
+    <span class="card-icon">🧩</span>
+    <span class="card-info">
+      <div class="card-num">ANIMATION 02</div>
+      <div class="card-name">爱心拼图 · 回忆相册</div>
+    </span>
+    <span class="card-arrow">›</span>
+  </a>
+  <a class="anim-card" href="03-烟花告白-夜空绽放.html">
+    <span class="card-icon">🎆</span>
+    <span class="card-info">
+      <div class="card-num">ANIMATION 03</div>
+      <div class="card-name">烟花告白 · 夜空绽放</div>
+    </span>
+    <span class="card-arrow">›</span>
+  </a>
+  <a class="anim-card" href="04-心跳轨迹-爱情地图.html">
+    <span class="card-icon">💗</span>
+    <span class="card-info">
+      <div class="card-num">ANIMATION 04</div>
+      <div class="card-name">心跳轨迹 · 爱情地图</div>
+    </span>
+    <span class="card-arrow">›</span>
+  </a>
+  <a class="anim-card" href="05-樱花飘落-时光胶囊.html">
+    <span class="card-icon">🌸</span>
+    <span class="card-info">
+      <div class="card-num">ANIMATION 05</div>
+      <div class="card-name">樱花飘落 · 时光胶囊</div>
+    </span>
+    <span class="card-arrow">›</span>
+  </a>
+  <a class="anim-card" href="06-密码告白-惊喜解锁.html">
+    <span class="card-icon">🔐</span>
+    <span class="card-info">
+      <div class="card-num">ANIMATION 06</div>
+      <div class="card-name">密码告白 · 惊喜解锁</div>
+    </span>
+    <span class="card-arrow">›</span>
+  </a>
+</div>
+
+<div class="footer">Made with love for 520</div>
+
+</body>
+</html>

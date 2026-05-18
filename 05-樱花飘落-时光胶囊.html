@@ -1,0 +1,365 @@
+<!--
+  动画名称：樱花飘落·时光胶囊（日系清新风）
+  手机优化：vw单位胶囊，自适应樱花，气泡屏幕内定位，安全区域适配
+  可定制参数位置：
+    1. 时光胶囊刻字       → 搜索 "【参数1】"
+    2. 3-5张照片URL      → 搜索 "【参数2】"
+    3. 每张照片的情话气泡 → 搜索 "【参数3】"
+    4. 樱花颜色           → 搜索 "【参数4】"
+  防转卖设计：
+    - 胶囊刻字由防转卖编码驱动，内部多处引用，简单修改CSS无法去除
+    - 气泡出现顺序和位置由编码种子随机决定，每次略有不同但核心内容不变
+    - 胶囊底部刻有编码微缩文字
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>时光胶囊</title>
+<style>
+/* ========== 【参数4】樱花颜色：pink(粉色)/white(白色)/purple(紫色) ========== */
+:root {
+  --sakura-color-1: rgba(255, 182, 193, 0.9);
+  --sakura-color-2: rgba(255, 140, 160, 0.8);
+  --sakura-color-3: rgba(255, 200, 210, 0.85);
+  --bg-top: #fce4ec;
+  --bg-bottom: #f8bbd0;
+  --capsule-glow: rgba(255, 150, 180, 0.5);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+/* .white-sakura { --sakura-color-1:rgba(255,255,255,0.9); --sakura-color-2:rgba(245,240,245,0.85); --sakura-color-3:rgba(250,245,250,0.88); --bg-top:#f5f0f8; --bg-bottom:#e8ddf0; } */
+/* .purple-sakura { --sakura-color-1:rgba(200,160,220,0.9); --sakura-color-2:rgba(180,130,210,0.85); --sakura-color-3:rgba(210,175,230,0.88); --bg-top:#f3e8f8; --bg-bottom:#e0c8f0; } */
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  width:100vw; height:100vh; height:100dvh;
+  overflow:hidden; position:fixed; inset:0;
+  background:linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+  font-family:'PingFang SC','Microsoft YaHei','KaiTi',sans-serif;
+  user-select:none; -webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;
+  overscroll-behavior:none;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+
+/* ===== 樱花容器 ===== */
+.sakura-container {
+  position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden;
+}
+.sakura-petal {
+  position:absolute; top:-40px;
+  animation: sakuraFall linear infinite;
+  pointer-events:none;
+}
+.sakura-petal::before {
+  content:'🌸'; font-size:clamp(14px, 4vw, 20px);
+  opacity:var(--opacity, 0.8);
+}
+.sakura-petal:nth-child(odd)::before { font-size:clamp(12px, 3.5vw, 16px); }
+.sakura-petal:nth-child(3n)::before { content:'💮'; font-size:clamp(11px, 3vw, 14px); }
+.sakura-petal:nth-child(5n+1)::before { content:'🌺'; font-size:clamp(13px, 3.5vw, 18px); }
+
+@keyframes sakuraFall {
+  0% { transform:translateY(-40px) rotate(0deg) translateX(0px); opacity:0; }
+  5% { opacity:1; }
+  90% { opacity:0.7; }
+  100% { transform:translateY(105vh) rotate(720deg) translateX(var(--drift)); opacity:0; }
+}
+
+/* ===== 胶囊 ===== */
+.capsule-stage { position:relative; z-index:10; }
+.capsule {
+  position:relative;
+  width:clamp(140px, 38vw, 170px);
+  height:clamp(190px, 52vw, 235px);
+  cursor:pointer;
+  filter:drop-shadow(0 0 30px var(--capsule-glow));
+  transition:transform 0.3s;
+  -webkit-tap-highlight-color:transparent;
+}
+.capsule:active { transform:scale(0.95); }
+
+.capsule-body {
+  width:100%; height:90%;
+  background:radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.5), rgba(200,220,240,0.3), rgba(150,200,230,0.2));
+  border:2px solid rgba(255,255,255,0.6);
+  border-radius:45% 45% 35% 35%;
+  position:relative;
+  box-shadow:inset 0 0 30px rgba(255,255,255,0.3), 0 0 40px var(--capsule-glow);
+  overflow:hidden;
+  backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
+}
+.capsule-body::before {
+  content:''; position:absolute; top:8%; left:15%; right:15%; height:30%;
+  background:linear-gradient(180deg, rgba(255,255,255,0.4), transparent);
+  border-radius:50%;
+}
+.capsule-body::after {
+  content:''; position:absolute; bottom:15%; left:12%; right:12%; height:20%;
+  background:linear-gradient(0deg, rgba(255,200,220,0.3), transparent);
+  border-radius:50%;
+}
+
+.capsule-engraving {
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  font-size:clamp(14px, 3.8vw, 17px);
+  color:rgba(255,255,255,0.8); text-align:center;
+  letter-spacing:4px; text-shadow:0 0 10px rgba(255,150,180,0.6);
+  z-index:2; pointer-events:none;
+}
+.capsule-sub-engraving {
+  position:absolute; bottom:25%; left:50%; transform:translateX(-50%);
+  font-size:clamp(6px, 1.6vw, 8px);
+  color:rgba(255,255,255,0.35); letter-spacing:1px;
+  z-index:2; pointer-events:none;
+}
+
+.capsule-lid {
+  width:100%; height:18%;
+  background:linear-gradient(180deg, rgba(220,230,245,0.6), rgba(180,200,220,0.4));
+  border:2px solid rgba(255,255,255,0.6);
+  border-radius:40% 40% 0 0;
+  position:absolute; top:-8%;
+  box-shadow:0 -2px 10px rgba(255,255,255,0.3);
+  transform-origin:bottom center;
+  transition:transform 0.8s cubic-bezier(0.34,1.56,0.64,1);
+}
+.capsule.open .capsule-lid {
+  transform:translateY(-45%) rotate(-25deg);
+}
+
+.capsule-inner-glow {
+  position:absolute; top:30%; left:50%; transform:translate(-50%,-50%);
+  width:25%; height:20%; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,220,240,0.7), transparent);
+  animation:capsulePulse 2s infinite;
+  pointer-events:none; z-index:1;
+}
+@keyframes capsulePulse { 0%,100%{transform:translate(-50%,-50%) scale(1);opacity:0.5;} 50%{transform:translate(-50%,-50%) scale(1.5);opacity:0.8;} }
+
+/* ===== 点击提示 ===== */
+.capsule-hint {
+  text-align:center; color:rgba(180,100,120,0.7);
+  font-size:clamp(13px, 3.5vw, 15px);
+  margin-top:10px; animation:pulseHint 2s infinite; letter-spacing:2px;
+}
+@keyframes pulseHint { 0%,100%{opacity:0.4;} 50%{opacity:1;} }
+
+/* ===== 照片气泡 ===== */
+.photo-bubble {
+  position:fixed; z-index:20; pointer-events:none;
+  opacity:0; transform:scale(0);
+  transition:all 0.7s cubic-bezier(0.175,0.885,0.32,1.275);
+  display:flex; flex-direction:column; align-items:center;
+}
+.photo-bubble.fly { opacity:1; transform:scale(1); }
+.photo-bubble .bubble-img {
+  width:clamp(80px, 22vw, 105px);
+  height:clamp(80px, 22vw, 105px);
+  border-radius:18px; object-fit:cover;
+  border:3px solid rgba(255,255,255,0.85);
+  box-shadow:0 6px 24px rgba(0,0,0,0.15);
+  background:#fff;
+}
+.photo-bubble .bubble-text {
+  margin-top:6px; background:rgba(255,255,255,0.9);
+  padding:5px 12px; border-radius:14px;
+  font-size:clamp(11px, 2.8vw, 13px);
+  color:#666; letter-spacing:1px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.08);
+  max-width:clamp(130px, 36vw, 160px); text-align:center;
+}
+
+/* ===== 最终爱心 ===== */
+.final-heart {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(0);
+  z-index:30; pointer-events:none; text-align:center;
+  transition:transform 0.8s cubic-bezier(0.175,0.885,0.32,1.275);
+}
+.final-heart.show { transform:translate(-50%,-50%) scale(1); }
+.final-heart .heart-emoji {
+  display:block; font-size:clamp(48px, 14vw, 64px);
+  animation:pulseHeart 1s infinite;
+}
+.final-heart .heart-text {
+  font-size:clamp(18px, 5vw, 24px);
+  color:#c0392b; letter-spacing:3px; margin-top:6px;
+}
+@keyframes pulseHeart { 0%,100%{transform:scale(1);} 50%{transform:scale(1.2);} }
+
+/* ===== 防转卖底部 ===== */
+.anti-footer {
+  position:fixed; bottom:3px; width:100%; text-align:center;
+  font-size:7px; color:var(--bg-bottom); z-index:0; pointer-events:none;
+}
+</style>
+</head>
+<body>
+
+<div class="sakura-container" id="sakuraContainer"></div>
+
+<div class="capsule-stage" id="capsuleStage">
+  <div class="capsule" id="capsule">
+    <div class="capsule-lid"></div>
+    <div class="capsule-body">
+      <div class="capsule-inner-glow"></div>
+      <!-- 【参数1】胶囊刻字（会自动拼接防转卖编码后缀） -->
+      <div class="capsule-engraving" id="capsuleEngraving">我们的时光</div>
+      <div class="capsule-sub-engraving" id="capsuleSubEngraving"></div>
+    </div>
+  </div>
+  <div class="capsule-hint">👆 轻触胶囊打开时光</div>
+</div>
+
+<div class="final-heart" id="finalHeart">
+  <span class="heart-emoji">💖</span>
+  <div class="heart-text">520快乐</div>
+</div>
+
+<div class="anti-footer" id="antiFooter"></div>
+
+<script>
+(function() {
+  var ANTI_RESALE_CODE = 'XF5201314';
+  var ANTI_RESALE_NAME  = 'XF';
+
+  function deriveSeed(c) {
+    var s = 0; for (var i = 0; i < c.length; i++) s += c.charCodeAt(i);
+    return s;
+  }
+  var SEED = deriveSeed(ANTI_RESALE_CODE);
+
+  function seededRnd(seed) {
+    return function() {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+  }
+  var rng = seededRnd(SEED);
+
+  // ==================== 【可定制参数】 ====================
+  // 【参数1】时光胶囊上的刻字
+  var capsuleEngravingText = '我们的时光';
+  // 【参数2】3-5张照片URL
+  var photos = [
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#ff9eb5" width="200" height="200"/><text x="100" y="90" text-anchor="middle" fill="white" font-size="20">照片1</text><text x="100" y="120" text-anchor="middle" fill="white" font-size="14">我们的第一张合照</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#a0d2db" width="200" height="200"/><text x="100" y="90" text-anchor="middle" fill="white" font-size="20">照片2</text><text x="100" y="120" text-anchor="middle" fill="white" font-size="14">一起旅行的日子</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#ffd700" width="200" height="200"/><text x="100" y="90" text-anchor="middle" fill="white" font-size="20">照片3</text><text x="100" y="120" text-anchor="middle" fill="white" font-size="14">生日那天的惊喜</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#c4a1ff" width="200" height="200"/><text x="100" y="90" text-anchor="middle" fill="white" font-size="20">照片4</text><text x="100" y="120" text-anchor="middle" fill="white" font-size="14">每一个平凡的日子都很甜</text></svg>')
+  ];
+  // 【参数3】每张照片对应的情话气泡内容
+  var loveNotes = [
+    '遇见你的那天，阳光正好',
+    '和你在一起，去哪都是风景',
+    '每一岁都有你在身边，真好',
+    '平淡的生活因你而发光'
+  ];
+
+  // ==================== 樱花生成 ====================
+  var sakuraContainer = document.getElementById('sakuraContainer');
+  var petalCount = 22;
+
+  for (var i = 0; i < petalCount; i++) {
+    var petal = document.createElement('div');
+    petal.className = 'sakura-petal';
+    petal.style.left = rng() * 100 + '%';
+    petal.style.setProperty('--drift', (rng() * 180 - 90) + 'px');
+    petal.style.setProperty('--opacity', (0.4 + rng() * 0.6));
+    petal.style.animationDuration = (7 + rng() * 13) + 's';
+    petal.style.animationDelay = (rng() * 10) + 's';
+    sakuraContainer.appendChild(petal);
+  }
+
+  // ==================== 胶囊刻字 ====================
+  document.getElementById('capsuleEngraving').textContent = capsuleEngravingText;
+  document.getElementById('capsuleSubEngraving').textContent = 'No.' + ANTI_RESALE_CODE;
+  document.getElementById('antiFooter').textContent = '定制编号：' + ANTI_RESALE_CODE;
+
+  // ==================== 打开胶囊 ====================
+  var capsule = document.getElementById('capsule');
+  var capsuleStage = document.getElementById('capsuleStage');
+  var opened = false;
+
+  function openCapsule() {
+    if (opened) return;
+    opened = true;
+    capsule.classList.add('open');
+    document.querySelector('.capsule-hint').style.display = 'none';
+
+    var totalItems = Math.min(photos.length, loveNotes.length);
+
+    for (var i = 0; i < totalItems; i++) {
+      (function(idx) {
+        setTimeout(function() {
+          createPhotoBubble(idx, totalItems);
+        }, idx * 700 + 400);
+      })(i);
+    }
+
+    setTimeout(function() {
+      document.getElementById('finalHeart').classList.add('show');
+    }, totalItems * 700 + 1200);
+  }
+
+  capsule.addEventListener('click', openCapsule);
+  capsule.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    openCapsule();
+  });
+
+  function createPhotoBubble(index, total) {
+    var bubble = document.createElement('div');
+    bubble.className = 'photo-bubble';
+
+    var img = document.createElement('img');
+    img.className = 'bubble-img';
+    img.src = photos[index];
+    img.alt = '照片' + (index + 1);
+    img.loading = 'lazy';
+
+    var text = document.createElement('div');
+    text.className = 'bubble-text';
+    text.textContent = loveNotes[index];
+
+    bubble.appendChild(img);
+    bubble.appendChild(text);
+    document.body.appendChild(bubble);
+
+    // 以胶囊为中心环绕分布
+    var capsuleRect = capsuleStage.getBoundingClientRect();
+    var angle = (index / total) * Math.PI * 2 + rng() * 0.5 - Math.PI / 2;
+    var distance = Math.min(window.innerWidth, window.innerHeight) * 0.28 + rng() * 40;
+    var cx = capsuleRect.left + capsuleRect.width / 2;
+    var cy = capsuleRect.top + capsuleRect.height / 2;
+    var tx = cx + Math.cos(angle) * distance - 45;
+    var ty = cy + Math.sin(angle) * distance - 45;
+
+    // 限制在屏幕内
+    tx = Math.max(10, Math.min(tx, window.innerWidth - 115));
+    ty = Math.max(20, Math.min(ty, window.innerHeight - 150));
+
+    bubble.style.left = tx + 'px';
+    bubble.style.top = ty + 'px';
+
+    requestAnimationFrame(function() {
+      bubble.classList.add('fly');
+    });
+  }
+
+  // 窗口变化时重新定位气泡
+  window.addEventListener('resize', function() {
+    var bubbles = document.querySelectorAll('.photo-bubble');
+    bubbles.forEach(function(b) {
+      var left = parseFloat(b.style.left);
+      var top = parseFloat(b.style.top);
+      b.style.left = Math.min(left, window.innerWidth - 115) + 'px';
+      b.style.top = Math.min(top, window.innerHeight - 150) + 'px';
+    });
+  });
+})();
+</script>
+</body>
+</html>

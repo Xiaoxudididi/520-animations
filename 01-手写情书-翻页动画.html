@@ -1,0 +1,358 @@
+<!--
+  动画名称：手写情书·翻页动画（文艺复古风）
+  手机优化：全屏信封+信纸，vw单位自适应，安全区域适配，触摸友好
+  可定制参数位置：
+    1. 收信人昵称 → 搜索 "【参数1】"
+    2. 情书全文   → 搜索 "【参数2】"
+    3. 写信日期   → 搜索 "【参数3】"
+    4. 邮戳文字   → 搜索 "【参数4】"
+    5. 信纸背景   → 搜索 "【参数5】"
+  防转卖设计：
+    - 爱心邮戳上半透明刻有客户名字缩写+唯一6位定制编号
+    - 页面底部有与背景同色的极小隐藏文字（全选可见）
+    - 翻页时序与定制编号绑定，修改编号会破坏动画节奏
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>手写情书</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
+
+/* ========== 【参数5】信纸背景颜色：kraft(牛皮纸)/white(白色)/pink(粉色) ========== */
+:root {
+  --paper-bg: #f4e4c1;
+  --paper-text: #3b2314;
+  --paper-line: #d4c5a0;
+  --envelope-color: #c4956a;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+/* 白色主题 .white { --paper-bg:#fffef7; --paper-text:#333; --paper-line:#e0dcd0; } */
+/* 粉色主题 .pink  { --paper-bg:#fff0f5; --paper-text:#8b4562; --paper-line:#f5d5e0; } */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100vw; height: 100vh; height: 100dvh;
+  overflow: hidden;
+  background: #2c1810;
+  font-family: 'Ma Shan Zheng', 'KaiTi', 'STKaiti', serif;
+  user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+
+/* ===== 信封 ===== */
+.envelope-container {
+  position: relative;
+  width: min(85vw, 340px);
+  height: calc(min(85vw, 340px) * 0.68);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.envelope {
+  position: absolute; width: 100%; height: 100%;
+  background: linear-gradient(135deg, #d4a574 0%, #c4956a 30%, #b8845a 60%, #c4956a 100%);
+  border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+.envelope-texture {
+  position: absolute; inset: 0; opacity: 0.15;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(139,90,43,0.5) 2px, rgba(139,90,43,0.5) 3px);
+}
+.envelope-flap {
+  position: absolute; top: 0; left: 0; width: 100%; height: 50%;
+  background: linear-gradient(180deg, #d4a574 0%, #c4956a 100%);
+  clip-path: polygon(0 0, 50% 100%, 100% 0);
+  transform-origin: top center; transition: transform 0.8s ease;
+  z-index: 3;
+}
+.envelope-flap.open { transform: rotateX(180deg); }
+.envelope-body { position: absolute; inset: 0; z-index: 1; }
+.envelope-address {
+  position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%);
+  font-size: clamp(13px, 3.5vw, 16px); color: #3b2314; text-align: center; z-index: 2;
+  letter-spacing: 2px; pointer-events: none; line-height: 1.6;
+}
+.envelope-seal {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(12vw, 44px); height: min(12vw, 44px);
+  background: #c0392b; border-radius: 50%;
+  z-index: 4; box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  font-size: clamp(16px, 5vw, 20px); color: #f5d5b8;
+}
+.envelope-hint {
+  position: absolute; bottom: -36px; width: 100%; text-align: center;
+  color: #a08060; font-size: clamp(12px, 3.2vw, 14px);
+  animation: pulse 2s infinite; letter-spacing: 1px;
+}
+@keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+/* ===== 信纸 ===== */
+.letter-stage {
+  display: none; position: relative;
+  width: min(88vw, 320px);
+  height: calc(min(88vw, 320px) * 1.45);
+  perspective: 1200px;
+  padding-bottom: var(--safe-bottom);
+}
+.letter-stage.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.letter-page {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  background: var(--paper-bg); color: var(--paper-text);
+  padding: 8% 8% 8% 12%; border-radius: 4px;
+  box-shadow: 0 3px 16px rgba(0,0,0,0.3);
+  transform-origin: bottom center;
+  backface-visibility: hidden; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.letter-page::before {
+  content: ''; position: absolute; top: 8%; left: 12%; bottom: 8%; width: 1px;
+  background: rgba(200,150,120,0.3);
+}
+.letter-lines {
+  position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent, transparent 27px, var(--paper-line) 27px, var(--paper-line) 28px);
+  padding-top: 30px; opacity: 0.6;
+}
+.letter-date {
+  text-align: right; font-size: clamp(11px, 2.8vw, 14px);
+  color: var(--paper-text); opacity: 0.65;
+  margin-bottom: 4px; position: relative; z-index: 1;
+}
+.letter-content {
+  position: relative; z-index: 1;
+  font-size: clamp(13px, 3.6vw, 17px);
+  line-height: 28px; flex: 1; overflow-y: auto;
+  white-space: pre-wrap; word-break: break-word;
+  -webkit-overflow-scrolling: touch;
+}
+.letter-content .line { opacity: 0; transition: opacity 0.5s; display: block; }
+.letter-content .line.show { opacity: 1; }
+
+/* ===== 邮戳 ===== */
+.stamp {
+  position: absolute; bottom: 8%; right: 8%;
+  width: min(18vw, 70px); height: min(18vw, 70px);
+  border: 3px solid #c0392b; border-radius: 50%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  opacity: 0; transform: scale(0.3) rotate(-30deg);
+  transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  color: #c0392b; font-size: clamp(10px, 2.5vw, 13px); z-index: 5;
+  background: rgba(255,255,255,0.2);
+}
+.stamp.show { opacity: 0.85; transform: scale(1) rotate(-15deg); }
+.stamp-heart { font-size: clamp(18px, 5vw, 24px); }
+.stamp-text { font-size: clamp(9px, 2.2vw, 11px); font-weight: bold; }
+.stamp-watermark {
+  position: absolute; inset: -2px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: clamp(6px, 1.6vw, 8px);
+  color: rgba(192,57,43,0.5); pointer-events: none;
+  transform: rotate(15deg); letter-spacing: 0.5px; z-index: 6;
+}
+
+/* ===== 底部防转卖隐藏文字 ===== */
+.anti-resale-footer {
+  position: fixed; bottom: 2px; left: 0; width: 100%; text-align: center;
+  font-size: 8px; color: #2c1810; pointer-events: none; z-index: 0;
+  letter-spacing: 0.3px;
+}
+
+/* ===== 提示 ===== */
+.click-hint {
+  color: #a08060; font-size: clamp(11px, 3vw, 14px);
+  text-align: center; margin-top: 6px; letter-spacing: 1px;
+}
+</style>
+</head>
+<body>
+
+<div class="envelope-container" id="envelopeBox">
+  <div class="envelope">
+    <div class="envelope-texture"></div>
+    <div class="envelope-flap" id="envelopeFlap"></div>
+    <div class="envelope-body"></div>
+    <!-- 【参数1】收信人昵称：修改下面文字 -->
+    <div class="envelope-address" id="envelopeAddress">致 亲爱的 小仙女<br>（点击打开）</div>
+    <div class="envelope-seal">❤</div>
+  </div>
+  <div class="envelope-hint">👆 轻触信封打开</div>
+</div>
+
+<div class="letter-stage" id="letterStage">
+  <div class="letter-page" id="letterPage">
+    <div class="letter-lines"></div>
+    <!-- 【参数3】写信日期：修改下面的日期 -->
+    <div class="letter-date" id="letterDate">2026年5月20日</div>
+    <!-- 【参数2】情书全文：修改下面文字，用 \n 换行分段 -->
+    <div class="letter-content" id="letterContent"></div>
+    <div class="stamp" id="stamp">
+      <span class="stamp-heart">❤</span>
+      <!-- 【参数4】邮戳主文字 -->
+      <span class="stamp-text">520快乐</span>
+    </div>
+    <div class="stamp-watermark" id="stampWatermark"></div>
+  </div>
+</div>
+
+<div class="anti-resale-footer" id="antiResaleFooter"></div>
+
+<script>
+(function() {
+  var ANTI_RESALE_CODE = 'XF5201314';
+  var ANTI_RESALE_NAME  = 'XF';
+
+  function deriveSeed(code) {
+    var s = 0;
+    for (var i = 0; i < code.length; i++) { s += code.charCodeAt(i); }
+    return s;
+  }
+  var SEED = deriveSeed(ANTI_RESALE_CODE);
+
+  // ==================== 【可定制参数】 ====================
+  // 【参数1】收信人昵称
+  var recipientName = '亲爱的 小仙女';
+  // 【参数2】情书全文（每行一个字符串，支持最多500字）
+  var loveLetterLines = [
+    '见字如面，',
+    '',
+    '今天是一个特别的日子，',
+    '我想把藏在心里很久的话，',
+    '一个字一个字地写给你看。',
+    '',
+    '认识你之前，',
+    '我以为世界就是这样平淡无奇。',
+    '认识你之后，',
+    '每一天都像是被阳光重新涂抹过。',
+    '',
+    '你的笑容，',
+    '是我见过的最美的风景。',
+    '你的声音，',
+    '是我听过的最动听的旋律。',
+    '',
+    '我想和你一起看春天的花，',
+    '听夏天的雨，',
+    '踩秋天的落叶，',
+    '等冬天的第一场雪。',
+    '',
+    '520快乐，我的唯一。',
+    '',
+    '永远爱你的，',
+    '我'
+  ];
+  // 【参数3】写信日期
+  var letterDate = '2026年5月20日';
+  // 【参数4】邮戳主文字
+  var stampText = '520快乐';
+
+  // ==================== 初始化 ====================
+  var envelopeBox = document.getElementById('envelopeBox');
+  var envelopeFlap = document.getElementById('envelopeFlap');
+  var letterStage = document.getElementById('letterStage');
+  var letterContent = document.getElementById('letterContent');
+  var stampEl = document.getElementById('stamp');
+
+  document.getElementById('envelopeAddress').innerHTML = '致 ' + recipientName + '<br>（点击打开）';
+  document.getElementById('letterDate').textContent = letterDate;
+  stampEl.querySelector('.stamp-text').textContent = stampText;
+
+  var wmText = ANTI_RESALE_NAME + '·' + ANTI_RESALE_CODE.slice(-6);
+  document.getElementById('stampWatermark').textContent = wmText;
+  document.getElementById('antiResaleFooter').textContent = '定制编号：' + ANTI_RESALE_CODE;
+
+  // 渲染情书
+  var html = '';
+  for (var i = 0; i < loveLetterLines.length; i++) {
+    html += '<span class="line">' + (loveLetterLines[i] || '&nbsp;') + '</span>';
+  }
+  letterContent.innerHTML = html;
+
+  // ==================== 翻页声音 ====================
+  var AudioCtx = window.AudioContext || window.webkitAudioContext;
+  var audioCtx = null;
+
+  function initAudio() {
+    if (!audioCtx) {
+      try { audioCtx = new AudioCtx(); } catch(e) {}
+    }
+  }
+
+  function playRustleSound() {
+    if (!audioCtx) return;
+    try {
+      var duration = 0.25 + Math.random() * 0.2;
+      var bufferSize = Math.floor(audioCtx.sampleRate * duration);
+      var buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      var data = buffer.getChannelData(0);
+      for (var i = 0; i < bufferSize; i++) {
+        var t = i / audioCtx.sampleRate;
+        var env = Math.exp(-t * 12);
+        data[i] = (Math.random() * 2 - 1) * env * 0.3;
+        data[i] += Math.sin(t * 800 + Math.random() * 2) * env * 0.05;
+      }
+      var source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      var filter = audioCtx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.value = 1500 + Math.random() * 1000;
+      filter.Q.value = 0.5;
+      source.connect(filter);
+      filter.connect(audioCtx.destination);
+      source.start();
+    } catch(e) {}
+  }
+
+  // ==================== 打开逻辑 ====================
+  var isOpen = false;
+  var currentLine = 0;
+  var allLines = [];
+  var lineDelay = 180 + (SEED % 7) * 10;
+
+  function openLetter() {
+    if (isOpen) return;
+    isOpen = true;
+    initAudio();
+    playRustleSound();
+
+    envelopeFlap.classList.add('open');
+
+    setTimeout(function() {
+      envelopeBox.style.display = 'none';
+      letterStage.classList.add('active');
+      allLines = document.querySelectorAll('.letter-content .line');
+      currentLine = 0;
+      showNextLine();
+    }, 700);
+  }
+
+  envelopeBox.addEventListener('click', openLetter);
+  envelopeBox.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    openLetter();
+  });
+
+  function showNextLine() {
+    if (currentLine >= allLines.length) {
+      setTimeout(function() {
+        stampEl.classList.add('show');
+        playRustleSound();
+      }, 400);
+      return;
+    }
+    allLines[currentLine].classList.add('show');
+    if (allLines[currentLine].textContent.trim() !== '') {
+      playRustleSound();
+    }
+    currentLine++;
+    setTimeout(showNextLine, lineDelay);
+  }
+})();
+</script>
+</body>
+</html>
