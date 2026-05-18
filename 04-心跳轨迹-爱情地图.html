@@ -64,11 +64,24 @@ html, body {
   position:fixed; bottom:clamp(90px, 16vh, 110px); left:50%; transform:translateX(-50%);
   background:rgba(13,17,23,0.92);
   border:1px solid rgba(255,255,255,0.12);
-  border-radius:18px; padding:clamp(12px, 3vw, 16px) clamp(18px, 5vw, 24px);
+  border-radius:20px; padding:0;
   color:#fff; z-index:1000; text-align:center;
-  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
-  min-width:clamp(240px, 70vw, 300px); max-width:88vw;
-  transition:opacity 0.5s;
+  backdrop-filter:blur(15px); -webkit-backdrop-filter:blur(15px);
+  min-width:clamp(280px, 75vw, 340px); max-width:88vw;
+  transition:all 0.6s cubic-bezier(0.175,0.885,0.32,1.275);
+  overflow:hidden;
+}
+.info-card .location-image {
+  width:100%; height:clamp(120px, 25vw, 160px);
+  object-fit:cover; display:block;
+  animation:imageFadeIn 0.8s ease;
+}
+@keyframes imageFadeIn {
+  from { opacity:0; transform:scale(1.1); }
+  to { opacity:1; transform:scale(1); }
+}
+.info-card .card-content {
+  padding:clamp(12px, 3vw, 16px) clamp(18px, 5vw, 24px);
 }
 .info-card .location-name {
   font-size:clamp(16px, 4.5vw, 20px);
@@ -76,11 +89,11 @@ html, body {
 }
 .info-card .location-date {
   font-size:clamp(11px, 3vw, 13px);
-  color:rgba(255,255,255,0.55); margin-bottom:4px;
+  color:rgba(255,255,255,0.55); margin-bottom:8px;
 }
 .info-card .location-desc {
   font-size:clamp(12px, 3.2vw, 14px);
-  color:rgba(255,255,255,0.75); line-height:1.5;
+  color:rgba(255,255,255,0.75); line-height:1.6;
 }
 
 /* ===== 底部文字 ===== */
@@ -129,9 +142,12 @@ html, body {
 <div id="mapContainer"></div>
 
 <div class="info-card" id="infoCard">
-  <div class="location-name" id="locName">准备开始...</div>
-  <div class="location-date" id="locDate"></div>
-  <div class="location-desc" id="locDesc"></div>
+  <img class="location-image" id="locImage" src="" alt="" style="display:none;">
+  <div class="card-content">
+    <div class="location-name" id="locName">准备开始...</div>
+    <div class="location-date" id="locDate"></div>
+    <div class="location-desc" id="locDesc"></div>
+  </div>
 </div>
 
 <div class="footer-text" id="footerText"></div>
@@ -156,23 +172,29 @@ html, body {
   var SEED = deriveSeed(ANTI_RESALE_CODE);
 
   var MARKER_COLORS = [];
-  for (var ci = 0; ci < 3; ci++) {
+  for (var ci = 0; ci < 4; ci++) {
     var h = (ANTI_RESALE_CODE.charCodeAt(ci % ANTI_RESALE_CODE.length) * 13 + ci * 47) % 360;
     MARKER_COLORS.push('hsl(' + h + ',70%,55%)');
   }
 
   // ==================== 【可定制参数】 ====================
-  // 【参数1】3个重要地点 [纬度, 经度, 地点名称]
+  // 【参数1】4个重要地点 [纬度, 经度, 地点名称]
   var locations = [
     { lat: 31.2304, lng: 121.4737, name: '相遇 · 上海外滩' },
     { lat: 30.2741, lng: 120.1551, name: '第一次约会 · 西湖断桥' },
-    { lat: 39.9042, lng: 116.4074, name: '确定关系 · 北京故宫' }
+    { lat: 39.9042, lng: 116.4074, name: '确定关系 · 北京故宫' },
+    { lat: 30.2741, lng: 120.1551, name: '订婚 · 杭州西湖' }
   ];
-  // 【参数2】每个地点对应的日期和事件描述
+  // 【参数2】每个地点对应的日期、事件描述和图片
   var locationDetails = [
-    { date: '2023年3月15日', desc: '在人海中遇见了你，从此世界变得不同' },
-    { date: '2023年6月21日', desc: '西湖边的第一次约会，你说喜欢夏天的风' },
-    { date: '2023年12月25日', desc: '圣诞节的雪夜里，我们确定了彼此的心意' }
+    { date: '2023年3月15日', desc: '在人海中遇见了你，从此世界变得不同', 
+      image: 'https://neeko-copilot.bytedance.net/api/text2image?prompt=romantic%20couple%20meeting%20at%20shanghai%20bund%20at%20sunset%20with%20beautiful%20city%20skyline%20illustration%20style&image_size=landscape_16_9' },
+    { date: '2023年6月21日', desc: '西湖边的第一次约会，你说喜欢夏天的风', 
+      image: 'https://neeko-copilot.bytedance.net/api/text2image?prompt=romantic%20couple%20on%20west%20lake%20bridge%20hangzhou%20summer%20evening%20beautiful%20scenery%20illustration%20style&image_size=landscape_16_9' },
+    { date: '2023年12月25日', desc: '圣诞节的雪夜里，我们确定了彼此的心意', 
+      image: 'https://neeko-copilot.bytedance.net/api/text2image?prompt=romantic%20couple%20in%20beijing%20forbidden%20city%20winter%20snow%20christmas%20romantic%20illustration%20style&image_size=landscape_16_9' },
+    { date: '2024年5月20日', desc: '在西湖畔，我单膝跪地，许下一生的承诺', 
+      image: 'https://neeko-copilot.bytedance.net/api/text2image?prompt=romantic%20couple%20engagement%20proposal%20at%20hangzhou%20west%20lake%20beautiful%20sunset%20rose%20petals%20illustration%20style&image_size=landscape_16_9' }
   ];
   // 【参数3】心跳速度（1-5，1最慢，5最快）
   var heartbeatSpeed = 3;
@@ -278,11 +300,24 @@ html, body {
   var locNameEl = document.getElementById('locName');
   var locDateEl = document.getElementById('locDate');
   var locDescEl = document.getElementById('locDesc');
+  var locImageEl = document.getElementById('locImage');
   var progressFill = document.getElementById('progressFill');
   var finalConfession = document.getElementById('finalConfession');
   var finalTextEl = document.getElementById('finalText');
   var currentLocation = 0;
   var allMarkers = [];
+  var loadedImages = {};
+
+  function preloadImages() {
+    locationDetails.forEach(function(detail, index) {
+      var img = new Image();
+      img.onload = function() {
+        loadedImages[index] = detail.image;
+      };
+      img.src = detail.image;
+    });
+  }
+  preloadImages();
 
   function showLocation(index) {
     if (index >= locations.length) {
@@ -310,19 +345,27 @@ html, body {
 
     setTimeout(function() {
       marker.bindPopup(
-        '<b>' + loc.name + '</b><br>' + detail.date + '<br>' + detail.desc,
-        { closeButton: false, className: 'love-popup' }
+        '<div style="max-width:200px;"><b>' + loc.name + '</b><br>' + detail.date + '<br>' + detail.desc + '</div>',
+        { closeButton: false, className: 'love-popup', maxWidth: 220 }
       ).openPopup();
     }, 2000);
 
     allMarkers.push(marker);
+    
+    if (detail.image) {
+      locImageEl.src = detail.image;
+      locImageEl.style.display = 'block';
+    } else {
+      locImageEl.style.display = 'none';
+    }
+    
     locNameEl.textContent = loc.name;
     locDateEl.textContent = detail.date;
     locDescEl.textContent = detail.desc;
     progressFill.style.width = ((index + 1) / locations.length * 100) + '%';
 
     currentLocation++;
-    setTimeout(function() { showLocation(currentLocation); }, 6000);
+    setTimeout(function() { showLocation(currentLocation); }, 7000);
   }
 
   function showFinalConfession() {
