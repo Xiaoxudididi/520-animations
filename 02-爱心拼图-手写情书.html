@@ -316,6 +316,7 @@ body.letter-phase .anti-footer { color:var(--letter-bg); }
       <div class="center-watermark" id="centerWatermark"></div>
     </div>
     <button class="btn-assemble" id="btnAssemble">💕 开始拼贴</button>
+    <button class="btn-assemble btn-to-letter" id="btnToLetter" style="display:none;">💌 打开信封</button>
     <div class="puzzle-final-text" id="puzzleFinalText"></div>
   </div>
 
@@ -551,12 +552,26 @@ body.letter-phase .anti-footer { color:var(--letter-bg); }
     }, assembleDuration + 400);
 
     // 启动过渡
-    setTimeout(startTransition, assembleDuration + 2500);
+    setTimeout(function() {
+      var btnToLetter = document.getElementById('btnToLetter');
+      if (btnToLetter) btnToLetter.style.display = 'block';
+    }, assembleDuration + 800);
   }
 
   btnAssemble.addEventListener('click', doAssemble);
   btnAssemble.addEventListener('touchend', function(e) {
     e.preventDefault(); doAssemble();
+  });
+
+  var btnToLetter = document.getElementById('btnToLetter');
+  btnToLetter.addEventListener('click', function() {
+    this.style.display = 'none';
+    startTransition();
+  });
+  btnToLetter.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    this.style.display = 'none';
+    startTransition();
   });
 
   // ==================== 照片点击放大 ====================
@@ -662,44 +677,9 @@ body.letter-phase .anti-footer { color:var(--letter-bg); }
   var allLines = [];
   var lineDelay = 180 + (SEED % 7) * 10;
 
-  // 声音
-  var AudioCtx = window.AudioContext || window.webkitAudioContext;
-  var audioCtx = null;
-
-  function initAudio() {
-    if (!audioCtx) { try { audioCtx = new AudioCtx(); } catch(e) {} }
-  }
-
-  function playRustleSound() {
-    if (!audioCtx) return;
-    try {
-      var dur = 0.25 + Math.random() * 0.2;
-      var bufSize = Math.floor(audioCtx.sampleRate * dur);
-      var buffer = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
-      var data = buffer.getChannelData(0);
-      for (var i = 0; i < bufSize; i++) {
-        var t = i / audioCtx.sampleRate;
-        var env = Math.exp(-t * 12);
-        data[i] = (Math.random() * 2 - 1) * env * 0.3;
-        data[i] += Math.sin(t * 800 + Math.random() * 2) * env * 0.05;
-      }
-      var source = audioCtx.createBufferSource();
-      source.buffer = buffer;
-      var filter = audioCtx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.value = 1500 + Math.random() * 1000;
-      filter.Q.value = 0.5;
-      source.connect(filter);
-      filter.connect(audioCtx.destination);
-      source.start();
-    } catch(e) {}
-  }
-
   function openLetter() {
     if (isOpen) return;
     isOpen = true;
-    initAudio();
-    playRustleSound();
 
     envelopeFlap.classList.add('open');
 
@@ -722,14 +702,10 @@ body.letter-phase .anti-footer { color:var(--letter-bg); }
     if (currentLine >= allLines.length) {
       setTimeout(function() {
         stampEl.classList.add('show');
-        playRustleSound();
       }, 400);
       return;
     }
     allLines[currentLine].classList.add('show');
-    if (allLines[currentLine].textContent.trim() !== '') {
-      playRustleSound();
-    }
     currentLine++;
     setTimeout(showNextLine, lineDelay);
   }
