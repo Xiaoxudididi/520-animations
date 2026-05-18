@@ -1,0 +1,753 @@
+<!--
+  动画名称：爱心拼图 → 手写情书（三段式衔接动画）
+  手机优化：全屏自适应，三阶段丝滑过渡，安全区域适配
+  阶段1：16片拼图飞入组成爱心
+  阶段2：爱心变成火漆印章，信封浮现
+  阶段3：打开信封，逐行手写情书
+  可定制参数位置：
+    1. 收信人昵称 → 搜索 "【参数1】"
+    2. 情书全文   → 搜索 "【参数2】"
+    3. 写信日期   → 搜索 "【参数3】"
+    4. 邮戳文字   → 搜索 "【参数4】"
+    5. 信纸背景   → 搜索 "【参数5】"
+    6. 16张照片URL → 搜索 "【参数6】"
+    7. 拼图完成文字 → 搜索 "【参数7】"
+    8. 拼图时长     → 搜索 "【参数8】"
+  防转卖设计：
+    - 拼图散落位置、翻页时序均由防转卖编码派生
+    - 邮戳水印+拼图水印双重保护
+    - 底部隐藏文字
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>爱心拼图 · 手写情书</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
+
+/* ========== 全局变量 ========== */
+:root {
+  --paper-bg: #f4e4c1;       /* 【参数5】信纸背景 */
+  --paper-text: #3b2314;
+  --paper-line: #d4c5a0;
+  --puzzle-bg: #1a1a2e;
+  --letter-bg: #2c1810;
+  --accent: #c0392b;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  width:100vw; height:100vh; height:100dvh;
+  overflow:hidden; position:fixed; inset:0;
+  background:var(--puzzle-bg);
+  font-family:'PingFang SC','Microsoft YaHei','KaiTi',sans-serif;
+  user-select:none; -webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;
+  overscroll-behavior:none;
+  transition:background 1.2s ease;
+}
+body.letter-phase {
+  background:var(--letter-bg);
+  font-family:'Ma Shan Zheng','KaiTi','STKaiti',serif;
+}
+
+/* ===== 全局容器 ===== */
+.main-stage {
+  position:fixed; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+
+/* ==========================================
+   阶段1：爱心拼图
+   ========================================== */
+.phase-puzzle {
+  display:flex; flex-direction:column; align-items:center;
+  transition:opacity 0.8s, transform 0.8s;
+}
+.phase-puzzle.fade-out { opacity:0; transform:scale(0.9); pointer-events:none; }
+
+.puzzle-area {
+  position:relative;
+  width:min(88vw, 360px);
+  height:calc(min(88vw, 360px) * 1.3);
+  flex-shrink:0;
+}
+.puzzle-piece {
+  position:absolute;
+  width:min(14.5vw, 56px); height:min(14.5vw, 56px);
+  cursor:pointer;
+  transition:all 0.7s cubic-bezier(0.34,1.56,0.64,1);
+  display:flex; align-items:center; justify-content:center;
+  font-size:min(7.5vw, 28px); z-index:2;
+  -webkit-tap-highlight-color:transparent;
+}
+.puzzle-piece.assembled { transition:all 0.5s ease; cursor:default; }
+.puzzle-piece .piece-img {
+  width:100%; height:100%; object-fit:cover; border-radius:50%;
+  position:absolute; inset:0; display:none; pointer-events:none;
+}
+.puzzle-piece.assembled .piece-img { display:block; }
+.puzzle-piece .piece-heart {
+  position:relative; z-index:1; pointer-events:none;
+  text-shadow:0 0 12px rgba(255,100,100,0.6);
+}
+.puzzle-piece.assembled .piece-heart { display:none; }
+.puzzle-piece .piece-marker {
+  position:absolute; bottom:1px; right:1px; width:1px; height:1px;
+  background:rgba(255,255,255,0.3); z-index:3; pointer-events:none;
+}
+.puzzle-piece.dissolving {
+  opacity:0; transform:scale(0.4);
+  transition:all 0.5s cubic-bezier(0.6,0,1,1);
+}
+
+.btn-assemble {
+  display:block; margin:16px auto 0;
+  padding:clamp(12px,3vw,14px) clamp(32px,8vw,40px);
+  background:linear-gradient(135deg,#e74c3c,#c0392b); color:#fff;
+  border:none; border-radius:30px;
+  font-size:clamp(16px,4vw,18px); cursor:pointer;
+  letter-spacing:2px; box-shadow:0 4px 15px rgba(231,76,60,0.4);
+  transition:transform 0.3s,opacity 0.5s;
+  -webkit-tap-highlight-color:transparent;
+  position:relative; z-index:20;
+}
+.btn-assemble:active { transform:scale(0.95); }
+.btn-assemble.disabled { opacity:0.3; pointer-events:none; }
+
+.puzzle-final-text {
+  text-align:center; color:#fff;
+  font-size:clamp(16px,4.2vw,20px);
+  margin-top:14px; letter-spacing:2px;
+  opacity:0; transform:translateY(15px);
+  transition:all 0.8s ease;
+  padding:0 16px;
+}
+.puzzle-final-text.show { opacity:1; transform:translateY(0); }
+
+.center-watermark {
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  color:rgba(255,255,255,0.1); font-size:min(3.2vw,14px);
+  pointer-events:none; z-index:10; letter-spacing:4px; white-space:nowrap;
+  opacity:0; transition:opacity 0.6s;
+}
+.center-watermark.show { opacity:1; }
+
+/* ===== 照片放大 ===== */
+.photo-modal {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.92);
+  z-index:200; align-items:center; justify-content:center; flex-direction:column;
+}
+.photo-modal.active { display:flex; }
+.photo-modal img {
+  max-width:90vw; max-height:60vh; border-radius:16px;
+  object-fit:contain; box-shadow:0 0 40px rgba(0,0,0,0.5);
+}
+.photo-modal .close-btn {
+  margin-top:20px; padding:12px 32px; background:rgba(255,255,255,0.12);
+  color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:22px;
+  font-size:15px; cursor:pointer; letter-spacing:2px;
+  min-height:44px; -webkit-tap-highlight-color:transparent;
+}
+
+/* ==========================================
+   阶段2：过渡动画（爱心 → 火漆印章）
+   ========================================== */
+.transition-seal {
+  position:fixed; z-index:50; pointer-events:none;
+  width:min(22vw,90px); height:min(22vw,90px);
+  background:var(--accent); border-radius:50%;
+  box-shadow:0 0 40px rgba(192,57,43,0.6), 0 0 80px rgba(192,57,43,0.3);
+  display:flex; align-items:center; justify-content:center;
+  font-size:min(12vw,48px); color:#f5d5b8;
+  opacity:0; transform:scale(1);
+  transition:all 1.2s cubic-bezier(0.25,0.46,0.45,0.94);
+  border:3px solid rgba(255,255,255,0.2);
+}
+.transition-seal.animate {
+  opacity:1;
+}
+
+/* ==========================================
+   阶段3：信封 + 信纸
+   ========================================== */
+.phase-letter {
+  display:none; flex-direction:column; align-items:center;
+  opacity:0; transform:translateY(30px);
+  transition:opacity 0.8s, transform 0.8s;
+}
+.phase-letter.show { opacity:1; transform:translateY(0); }
+
+.envelope-container {
+  position:relative;
+  width:min(82vw,320px);
+  height:calc(min(82vw,320px) * 0.68);
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.envelope {
+  position:absolute; width:100%; height:100%;
+  background:linear-gradient(135deg,#d4a574 0%,#c4956a 30%,#b8845a 60%,#c4956a 100%);
+  border-radius:10px; box-shadow:0 10px 40px rgba(0,0,0,0.5);
+  overflow:hidden;
+}
+.envelope-texture {
+  position:absolute; inset:0; opacity:0.15;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(139,90,43,0.5) 2px,rgba(139,90,43,0.5) 3px);
+}
+.envelope-flap {
+  position:absolute; top:0; left:0; width:100%; height:50%;
+  background:linear-gradient(180deg,#d4a574 0%,#c4956a 100%);
+  clip-path:polygon(0 0, 50% 100%, 100% 0);
+  transform-origin:top center; transition:transform 0.8s ease;
+  z-index:3;
+}
+.envelope-flap.open { transform:rotateX(180deg); }
+.envelope-body { position:absolute; inset:0; z-index:1; }
+.envelope-address {
+  position:absolute; top:55%; left:50%; transform:translate(-50%,-50%);
+  font-size:clamp(12px,3.2vw,15px); color:#3b2314; text-align:center; z-index:2;
+  letter-spacing:2px; pointer-events:none; line-height:1.6;
+}
+.envelope-seal {
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:min(11vw,42px); height:min(11vw,42px);
+  background:var(--accent); border-radius:50%;
+  z-index:4; box-shadow:0 2px 10px rgba(0,0,0,0.4);
+  display:flex; align-items:center; justify-content:center;
+  font-size:clamp(15px,4.5vw,19px); color:#f5d5b8;
+  animation:sealGlow 2s infinite;
+}
+@keyframes sealGlow { 0%,100%{box-shadow:0 2px 10px rgba(0,0,0,0.4);} 50%{box-shadow:0 0 25px rgba(192,57,43,0.5);} }
+
+.envelope-hint {
+  position:absolute; bottom:-34px; width:100%; text-align:center;
+  color:#a08060; font-size:clamp(11px,3vw,14px);
+  animation:pulse 2s infinite; letter-spacing:1px;
+}
+@keyframes pulse { 0%,100%{opacity:0.4;} 50%{opacity:1;} }
+
+/* ===== 信纸 ===== */
+.letter-stage {
+  display:none; position:relative;
+  width:min(86vw,310px);
+  height:calc(min(86vw,310px) * 1.4);
+  perspective:1200px;
+}
+.letter-stage.active { display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.letter-page {
+  position:absolute; inset:0; width:100%; height:100%;
+  background:var(--paper-bg); color:var(--paper-text);
+  padding:8% 8% 8% 12%; border-radius:4px;
+  box-shadow:0 3px 16px rgba(0,0,0,0.3);
+  transform-origin:bottom center;
+  backface-visibility:hidden; overflow:hidden;
+  display:flex; flex-direction:column;
+}
+.letter-page::before {
+  content:''; position:absolute; top:8%; left:12%; bottom:8%; width:1px;
+  background:rgba(200,150,120,0.3);
+}
+.letter-lines {
+  position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 27px,var(--paper-line) 27px,var(--paper-line) 28px);
+  padding-top:30px; opacity:0.6;
+}
+.letter-date {
+  text-align:right; font-size:clamp(11px,2.8vw,14px);
+  color:var(--paper-text); opacity:0.65;
+  margin-bottom:4px; position:relative; z-index:1;
+}
+.letter-content {
+  position:relative; z-index:1;
+  font-size:clamp(13px,3.6vw,17px); line-height:28px;
+  flex:1; overflow-y:auto;
+  white-space:pre-wrap; word-break:break-word;
+  -webkit-overflow-scrolling:touch;
+}
+.letter-content .line { opacity:0; transition:opacity 0.5s; display:block; }
+.letter-content .line.show { opacity:1; }
+
+/* ===== 邮戳 ===== */
+.stamp {
+  position:absolute; bottom:8%; right:8%;
+  width:min(17vw,66px); height:min(17vw,66px);
+  border:3px solid var(--accent); border-radius:50%;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  opacity:0; transform:scale(0.3) rotate(-30deg);
+  transition:all 0.6s cubic-bezier(0.175,0.885,0.32,1.275);
+  color:var(--accent); font-size:clamp(10px,2.5vw,13px); z-index:5;
+  background:rgba(255,255,255,0.2);
+}
+.stamp.show { opacity:0.85; transform:scale(1) rotate(-15deg); }
+.stamp-heart { font-size:clamp(17px,4.5vw,22px); }
+.stamp-text { font-size:clamp(9px,2.2vw,11px); font-weight:bold; }
+.stamp-watermark {
+  position:absolute; inset:-2px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:clamp(6px,1.6vw,7px);
+  color:rgba(192,57,43,0.5); pointer-events:none;
+  transform:rotate(15deg); letter-spacing:0.5px; z-index:6;
+}
+
+/* ===== 防转卖底部 ===== */
+.anti-footer {
+  position:fixed; bottom:2px; width:100%; text-align:center;
+  font-size:7px; color:var(--puzzle-bg); pointer-events:none; z-index:0;
+  letter-spacing:0.3px; transition:color 1.2s;
+}
+body.letter-phase .anti-footer { color:var(--letter-bg); }
+</style>
+</head>
+<body>
+
+<div class="main-stage" id="mainStage">
+
+  <!-- ========== 阶段1：爱心拼图 ========== -->
+  <div class="phase-puzzle" id="phasePuzzle">
+    <div class="puzzle-area" id="puzzleArea">
+      <div class="center-watermark" id="centerWatermark"></div>
+    </div>
+    <button class="btn-assemble" id="btnAssemble">💕 开始拼贴</button>
+    <div class="puzzle-final-text" id="puzzleFinalText"></div>
+  </div>
+
+  <!-- ========== 阶段3：信封+信纸（初始隐藏） ========== -->
+  <div class="phase-letter" id="phaseLetter">
+    <div class="envelope-container" id="envelopeBox">
+      <div class="envelope">
+        <div class="envelope-texture"></div>
+        <div class="envelope-flap" id="envelopeFlap"></div>
+        <div class="envelope-body"></div>
+        <!-- 【参数1】收信人昵称 -->
+        <div class="envelope-address" id="envelopeAddress">致 亲爱的 小仙女<br>（点击打开）</div>
+        <div class="envelope-seal">❤</div>
+      </div>
+      <div class="envelope-hint">👆 轻触信封打开</div>
+    </div>
+    <div class="letter-stage" id="letterStage">
+      <div class="letter-page" id="letterPage">
+        <div class="letter-lines"></div>
+        <!-- 【参数3】写信日期 -->
+        <div class="letter-date" id="letterDate">2026年5月20日</div>
+        <!-- 【参数2】情书全文 -->
+        <div class="letter-content" id="letterContent"></div>
+        <div class="stamp" id="stamp">
+          <span class="stamp-heart">❤</span>
+          <!-- 【参数4】邮戳文字 -->
+          <span class="stamp-text">520快乐</span>
+        </div>
+        <div class="stamp-watermark" id="stampWatermark"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 过渡动画专用：飞行的爱心 -->
+<div class="transition-seal" id="transitionSeal">❤</div>
+
+<!-- 照片放大预览 -->
+<div class="photo-modal" id="photoModal">
+  <img src="" alt="照片" id="modalImg">
+  <button class="close-btn" id="modalClose">关闭</button>
+</div>
+
+<!-- 防转卖 -->
+<div class="anti-footer" id="antiFooter"></div>
+
+<script>
+(function() {
+  // ==================== 【防转卖核心参数】 ====================
+  var ANTI_RESALE_CODE = 'XF5201314';
+  var ANTI_RESALE_NAME  = 'XF';
+
+  function deriveSeed(c) {
+    var s = 0;
+    for (var i = 0; i < c.length; i++) s += c.charCodeAt(i);
+    return s;
+  }
+  var SEED = deriveSeed(ANTI_RESALE_CODE);
+
+  // ==================== 【可定制参数】 ====================
+  // 【参数1】收信人昵称
+  var recipientName = '亲爱的 小仙女';
+  // 【参数2】情书全文
+  var loveLetterLines = [
+    '见字如面，','','今天是一个特别的日子，',
+    '我想把藏在心里很久的话，','一个字一个字地写给你看。','',
+    '认识你之前，','我以为世界就是这样平淡无奇。',
+    '认识你之后，','每一天都像是被阳光重新涂抹过。','',
+    '你的笑容，','是我见过的最美的风景。',
+    '你的声音，','是我听过的最动听的旋律。','',
+    '我想和你一起看春天的花，','听夏天的雨，',
+    '踩秋天的落叶，','等冬天的第一场雪。','',
+    '520快乐，我的唯一。','','永远爱你的，','我'
+  ];
+  // 【参数3】写信日期
+  var letterDate = '2026年5月20日';
+  // 【参数4】邮戳文字
+  var stampText = '520快乐';
+  // 【参数6】16张照片URL
+  var photos = [
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#ff6b9d" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">1</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#c0392b" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">2</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#e67e22" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">3</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#f1c40f" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">4</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#2ecc71" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">5</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#3498db" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">6</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#9b59b6" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">7</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#1abc9c" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">8</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#e74c3c" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">9</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#34495e" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">10</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#e91e63" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">11</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#00bcd4" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">12</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#ff9800" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">13</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#8bc34a" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">14</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#673ab7" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">15</text></svg>'),
+    'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#f44336" width="200" height="200"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="white" font-size="60">16</text></svg>')
+  ];
+  // 【参数7】拼图完成后的文字
+  var puzzleFinalMessage = '我们的故事 未完待续...';
+  // 【参数8】拼图完成总时长（毫秒，800-3000）
+  var assembleDuration = 1500;
+
+  // ==================== 爱心形状坐标 ====================
+  function heartPosition(index, total, scale) {
+    var t = (index / total) * Math.PI * 2 - Math.PI / 2;
+    var x = 16 * Math.pow(Math.sin(t), 3);
+    var y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
+    return { x: x * scale, y: y * scale };
+  }
+
+  function seededRandom(seed) {
+    return function() {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+  }
+  var rng = seededRandom(SEED);
+
+  // ==================== DOM引用 ====================
+  var bodyEl = document.body;
+  var puzzleArea = document.getElementById('puzzleArea');
+  var btnAssemble = document.getElementById('btnAssemble');
+  var puzzleFinalText = document.getElementById('puzzleFinalText');
+  var centerWatermark = document.getElementById('centerWatermark');
+  var phasePuzzle = document.getElementById('phasePuzzle');
+  var phaseLetter = document.getElementById('phaseLetter');
+  var transitionSeal = document.getElementById('transitionSeal');
+  var envelopeBox = document.getElementById('envelopeBox');
+  var envelopeFlap = document.getElementById('envelopeFlap');
+  var letterStage = document.getElementById('letterStage');
+  var letterContent = document.getElementById('letterContent');
+  var stampEl = document.getElementById('stamp');
+  var photoModal = document.getElementById('photoModal');
+  var modalImg = document.getElementById('modalImg');
+
+  // ==================== 初始化情书内容 ====================
+  document.getElementById('envelopeAddress').innerHTML = '致 ' + recipientName + '<br>（点击打开）';
+  document.getElementById('letterDate').textContent = letterDate;
+  stampEl.querySelector('.stamp-text').textContent = stampText;
+  var wmText = ANTI_RESALE_NAME + '·' + ANTI_RESALE_CODE.slice(-6);
+  document.getElementById('stampWatermark').textContent = wmText;
+  document.getElementById('antiFooter').textContent = '定制编号：' + ANTI_RESALE_CODE;
+
+  var html = '';
+  for (var li = 0; li < loveLetterLines.length; li++) {
+    html += '<span class="line">' + (loveLetterLines[li] || '&nbsp;') + '</span>';
+  }
+  letterContent.innerHTML = html;
+
+  // ==================== 阶段1：创建拼图 ====================
+  var pieces = [];
+  var assembled = false;
+
+  function getAreaSize() {
+    return { w: puzzleArea.clientWidth, h: puzzleArea.clientHeight };
+  }
+
+  function createPieces() {
+    puzzleArea.querySelectorAll('.puzzle-piece').forEach(function(p) { p.remove(); });
+    pieces = [];
+    var area = getAreaSize();
+    var sc = Math.min(area.w, area.h) / 38;
+    var ps = Math.floor(Math.min(area.w, area.h) / 7.5);
+
+    for (var i = 0; i < 16; i++) {
+      var piece = document.createElement('div');
+      piece.className = 'puzzle-piece';
+      piece.setAttribute('data-index', i);
+      piece.style.width = ps + 'px';
+      piece.style.height = ps + 'px';
+
+      var sx = rng() * (area.w - ps);
+      var sy = rng() * (area.h - ps);
+      piece.style.left = sx + 'px';
+      piece.style.top = sy + 'px';
+
+      var heart = document.createElement('span');
+      heart.className = 'piece-heart';
+      heart.textContent = ['❤','💕','💗','💖','💘','💝','💓','💞'][i % 8];
+      piece.appendChild(heart);
+
+      var img = document.createElement('img');
+      img.className = 'piece-img';
+      img.src = photos[i];
+      img.alt = '照片' + (i+1);
+      img.loading = 'lazy';
+      piece.appendChild(img);
+
+      var marker = document.createElement('span');
+      marker.className = 'piece-marker';
+      marker.textContent = '.';
+      piece.appendChild(marker);
+
+      puzzleArea.appendChild(piece);
+      pieces.push({ el: piece, index: i, size: ps, scale: sc });
+    }
+  }
+  createPieces();
+
+  // ==================== 拼贴动画 ====================
+  function doAssemble() {
+    if (assembled) return;
+    assembled = true;
+    btnAssemble.classList.add('disabled');
+
+    var area = getAreaSize();
+    var cx = area.w / 2, cy = area.h / 2;
+
+    pieces.forEach(function(p) {
+      var pos = heartPosition(p.index, 16, p.scale);
+      var h = p.size / 2;
+      var tx = cx + pos.x - h;
+      var ty = cy + pos.y - h;
+
+      setTimeout(function() {
+        p.el.style.left = tx + 'px';
+        p.el.style.top = ty + 'px';
+        p.el.classList.add('assembled');
+      }, p.index * (assembleDuration / 16));
+    });
+
+    // 水印
+    setTimeout(function() {
+      centerWatermark.textContent = ANTI_RESALE_NAME + '专属定制';
+      centerWatermark.classList.add('show');
+    }, assembleDuration);
+
+    // 完成文字
+    setTimeout(function() {
+      puzzleFinalText.textContent = puzzleFinalMessage;
+      puzzleFinalText.classList.add('show');
+    }, assembleDuration + 400);
+
+    // 启动过渡
+    setTimeout(startTransition, assembleDuration + 2500);
+  }
+
+  btnAssemble.addEventListener('click', doAssemble);
+  btnAssemble.addEventListener('touchend', function(e) {
+    e.preventDefault(); doAssemble();
+  });
+
+  // ==================== 照片点击放大 ====================
+  puzzleArea.addEventListener('click', function(e) {
+    var piece = e.target.closest('.puzzle-piece');
+    if (!piece || !piece.classList.contains('assembled')) return;
+    var idx = parseInt(piece.getAttribute('data-index'));
+    modalImg.src = photos[idx];
+    photoModal.classList.add('active');
+  });
+  document.getElementById('modalClose').addEventListener('click', function() {
+    photoModal.classList.remove('active');
+  });
+  photoModal.addEventListener('click', function(e) {
+    if (e.target === photoModal) photoModal.classList.remove('active');
+  });
+
+  // ==================== 阶段2：过渡动画 ====================
+  function startTransition() {
+    // 1. 获取拼图爱心中心位置（用于过渡起始点）
+    var puzzleRect = puzzleArea.getBoundingClientRect();
+    var puzzleCX = puzzleRect.left + puzzleRect.width / 2;
+    var puzzleCY = puzzleRect.top + puzzleRect.height / 2;
+
+    // 2. 计算信封封口位置（过渡终点）
+    // 信封还未显示，先显示它
+    phaseLetter.style.display = 'flex';
+    phaseLetter.offsetHeight; // force reflow
+    var envelopeRect = envelopeBox.getBoundingClientRect();
+    var sealTargetX = envelopeRect.left + envelopeRect.width / 2;
+    var sealTargetY = envelopeRect.top + envelopeRect.height / 2;
+
+    // 隐藏信封准备动画
+    phaseLetter.style.display = 'none';
+
+    // 3. 定位过渡爱心在拼图中心
+    var sealSize = Math.min(window.innerWidth * 0.22, 90);
+    transitionSeal.style.width = sealSize + 'px';
+    transitionSeal.style.height = sealSize + 'px';
+    transitionSeal.style.left = (puzzleCX - sealSize/2) + 'px';
+    transitionSeal.style.top = (puzzleCY - sealSize/2) + 'px';
+    transitionSeal.style.opacity = '0';
+    transitionSeal.style.transform = 'scale(0.3)';
+    transitionSeal.style.transition = 'none';
+
+    // force reflow
+    transitionSeal.offsetHeight;
+
+    // 4. 爱心出现并放大
+    transitionSeal.style.transition = 'all 0.6s cubic-bezier(0.175,0.885,0.32,1.275)';
+    transitionSeal.style.opacity = '1';
+    transitionSeal.style.transform = 'scale(1.2)';
+
+    // 5. 同时溶解拼图碎片
+    pieces.forEach(function(p, i) {
+      setTimeout(function() {
+        p.el.classList.add('dissolving');
+      }, i * 30);
+    });
+    puzzleFinalText.style.opacity = '0';
+    centerWatermark.style.opacity = '0';
+    btnAssemble.style.opacity = '0';
+
+    // 6. 爱心飞向信封位置
+    setTimeout(function() {
+      var targetSize = Math.min(window.innerWidth * 0.11, 42);
+      transitionSeal.style.transition = 'all 1.0s cubic-bezier(0.25,0.46,0.45,0.94)';
+      transitionSeal.style.left = (sealTargetX - targetSize/2) + 'px';
+      transitionSeal.style.top = (sealTargetY - targetSize/2) + 'px';
+      transitionSeal.style.width = targetSize + 'px';
+      transitionSeal.style.height = targetSize + 'px';
+      transitionSeal.style.transform = 'scale(1)';
+      transitionSeal.style.borderRadius = '50%';
+
+      // 背景过渡
+      bodyEl.classList.add('letter-phase');
+    }, 700);
+
+    // 7. 爱心到达后，显示信封
+    setTimeout(function() {
+      transitionSeal.style.opacity = '0';
+      transitionSeal.style.transition = 'opacity 0.3s';
+
+      phasePuzzle.style.display = 'none';
+      phaseLetter.style.display = 'flex';
+      phaseLetter.offsetHeight;
+      phaseLetter.classList.add('show');
+
+      // 信封封口上的爱心闪烁
+      setTimeout(function() {
+        var seal = document.querySelector('.envelope-seal');
+        seal.style.transform = 'translate(-50%,-50%) scale(1.3)';
+        setTimeout(function() {
+          seal.style.transform = 'translate(-50%,-50%) scale(1)';
+        }, 200);
+      }, 300);
+    }, 1800);
+  }
+
+  // ==================== 阶段3：打开信封 ====================
+  var isOpen = false;
+  var currentLine = 0;
+  var allLines = [];
+  var lineDelay = 180 + (SEED % 7) * 10;
+
+  // 声音
+  var AudioCtx = window.AudioContext || window.webkitAudioContext;
+  var audioCtx = null;
+
+  function initAudio() {
+    if (!audioCtx) { try { audioCtx = new AudioCtx(); } catch(e) {} }
+  }
+
+  function playRustleSound() {
+    if (!audioCtx) return;
+    try {
+      var dur = 0.25 + Math.random() * 0.2;
+      var bufSize = Math.floor(audioCtx.sampleRate * dur);
+      var buffer = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+      var data = buffer.getChannelData(0);
+      for (var i = 0; i < bufSize; i++) {
+        var t = i / audioCtx.sampleRate;
+        var env = Math.exp(-t * 12);
+        data[i] = (Math.random() * 2 - 1) * env * 0.3;
+        data[i] += Math.sin(t * 800 + Math.random() * 2) * env * 0.05;
+      }
+      var source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      var filter = audioCtx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.value = 1500 + Math.random() * 1000;
+      filter.Q.value = 0.5;
+      source.connect(filter);
+      filter.connect(audioCtx.destination);
+      source.start();
+    } catch(e) {}
+  }
+
+  function openLetter() {
+    if (isOpen) return;
+    isOpen = true;
+    initAudio();
+    playRustleSound();
+
+    envelopeFlap.classList.add('open');
+
+    setTimeout(function() {
+      envelopeBox.style.display = 'none';
+      letterStage.classList.add('active');
+      allLines = document.querySelectorAll('.letter-content .line');
+      currentLine = 0;
+      showNextLine();
+    }, 700);
+  }
+
+  envelopeBox.addEventListener('click', openLetter);
+  envelopeBox.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    openLetter();
+  });
+
+  function showNextLine() {
+    if (currentLine >= allLines.length) {
+      setTimeout(function() {
+        stampEl.classList.add('show');
+        playRustleSound();
+      }, 400);
+      return;
+    }
+    allLines[currentLine].classList.add('show');
+    if (allLines[currentLine].textContent.trim() !== '') {
+      playRustleSound();
+    }
+    currentLine++;
+    setTimeout(showNextLine, lineDelay);
+  }
+
+  // ==================== 窗口大小变化 ====================
+  var resizeTimer;
+  window.addEventListener('resize', function() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function() {
+      if (!assembled) createPieces();
+    }, 300);
+  });
+  window.addEventListener('orientationchange', function() {
+    setTimeout(function() {
+      if (!assembled) createPieces();
+    }, 500);
+  });
+})();
+</script>
+</body>
+</html>
